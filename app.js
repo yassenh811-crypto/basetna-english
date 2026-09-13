@@ -1,63 +1,39 @@
 /* ============================================================
-   بسّطنا الإنجليزي — app.js v8 (النهائي)
+   بسّطنا الإنجليزي — app.js v9
+   - تسجيل دخول فقط (بدون إنشاء حساب)
+   - حماية من مشكلة localStorage على بعض المتصفحات
+   - شات + دعم فني + محادثة خاصة
    ============================================================ */
-   /* ============================================================
+
+/* ============================================================
    🛡️ حماية: لو localStorage مش متاح، استخدم بديل في الذاكرة
-   (يحل مشكلة "Access is denied for localStorage" على بعض المتصفحات)
+   (لازم تكون في أول سطر قبل أي كود تاني)
    ============================================================ */
-(function ensureStorageSafe(){
-  function makeMemoryStorage(){
-    const mem = {};
+(function(){
+  function makeMem(){
+    const m = {};
     return {
-      getItem: (k) => (k in mem ? mem[k] : null),
-      setItem: (k, v) => { mem[k] = String(v); },
-      removeItem: (k) => { delete mem[k]; },
-      clear: () => { Object.keys(mem).forEach(k => delete mem[k]); },
-      key: (i) => Object.keys(mem)[i] || null,
-      get length(){ return Object.keys(mem).length; }
+      getItem: (k) => (k in m ? m[k] : null),
+      setItem: (k, v) => { m[k] = String(v); },
+      removeItem: (k) => { delete m[k]; },
+      clear: () => { Object.keys(m).forEach(k => delete m[k]); },
+      key: (i) => Object.keys(m)[i] || null,
+      get length(){ return Object.keys(m).length; }
     };
   }
-
-  // اختبار localStorage
-  let lsOk = false;
-  try {
-    localStorage.setItem("__test__", "1");
-    localStorage.removeItem("__test__");
-    lsOk = true;
-  } catch(e){ lsOk = false; }
-
-  if (!lsOk){
-    console.warn("⚠️ localStorage مش متاح — استخدام بديل في الذاكرة");
-    try {
-      Object.defineProperty(window, "localStorage", {
-        configurable: true,
-        value: makeMemoryStorage()
-      });
-    } catch(e){
-      // لو حتى defineProperty فشلت، استخدم متغير داخلي
-      window.__memStorage = makeMemoryStorage();
-      window.localStorage = window.__memStorage;
-    }
+  function test(s){
+    try { s.setItem("__t__","1"); s.removeItem("__t__"); return true; }
+    catch(e){ return false; }
   }
-
-  // اختبار sessionStorage
-  let ssOk = false;
-  try {
-    sessionStorage.setItem("__test__", "1");
-    sessionStorage.removeItem("__test__");
-    ssOk = true;
-  } catch(e){ ssOk = false; }
-
-  if (!ssOk){
-    console.warn("⚠️ sessionStorage مش متاح — استخدام بديل في الذاكرة");
-    try {
-      Object.defineProperty(window, "sessionStorage", {
-        configurable: true,
-        value: makeMemoryStorage()
-      });
-    } catch(e){
-      window.sessionStorage = makeMemoryStorage();
-    }
+  if (!test(window.localStorage)){
+    console.warn("⚠️ localStorage معطّل — هيتم استخدام بديل في الذاكرة");
+    try { Object.defineProperty(window, "localStorage", { configurable:true, value: makeMem() }); }
+    catch(e){ window.localStorage = makeMem(); }
+  }
+  if (!test(window.sessionStorage)){
+    console.warn("⚠️ sessionStorage معطّل — هيتم استخدام بديل في الذاكرة");
+    try { Object.defineProperty(window, "sessionStorage", { configurable:true, value: makeMem() }); }
+    catch(e){ window.sessionStorage = makeMem(); }
   }
 })();
 
@@ -111,10 +87,9 @@ function logOk(ctx, msg){ console.log(`[✓ ${ctx}]`, msg||""); if (msg) showToa
 
 let CURRENT_LEVELS = [];
 let CURRENT_PROFILE = null;
-let MESSAGES_UNSUB = null;
 let ALL_CONTACTS = [];
 
-/* ---------- الدول ---------- */
+/* ---------- الدول العربية ---------- */
 const ARAB_COUNTRIES = [
   { code:"EG", dial:"20",  ar:"مصر", en:"Egypt" },
   { code:"SA", dial:"966", ar:"السعودية", en:"Saudi Arabia" },
@@ -182,34 +157,11 @@ function showView(view){
 
 /* ---------- كل الأزرار ظاهرة للكل ---------- */
 function hideSupportFabsForRole(role){
-  const btns = document.querySelectorAll(".support-fab");
-  btns.forEach(b => { b.style.display = "flex"; });
+  document.querySelectorAll(".support-fab").forEach(b => { b.style.display = "flex"; });
 }
 
 /* ---------- Auth ---------- */
 function showMsg(el, text, type){ el.textContent = text; el.className = "form-msg " + type; }
-
-async function handleSignup(e){
-  e.preventDefault();
-  const msg = document.getElementById("signup-msg");
-  const fullName = document.getElementById("su-name").value.trim();
-  const email = document.getElementById("su-email").value.trim();
-  const phone = document.getElementById("su-phone").value.trim();
-  const password = document.getElementById("su-password").value;
-  if (!fullName || !email || !password){ showMsg(msg, "من فضلك إملأ كل الحقول", "error"); return; }
-  showMsg(msg, "جاري إنشاء الحساب...", "ok");
-  const { data, error } = await supabaseClient.auth.signUp({ email, password });
-  if (error){ showMsg(msg, friendlyError(error), "error"); logError("إنشاء الحساب", error); return; }
-  const userId = data.user?.id;
-  if (userId){
-    const { error: pe } = await supabaseClient.from("profiles")
-      .insert({ id: userId, full_name: fullName, phone, role: "student" });
-    if (pe){ showMsg(msg, friendlyError(pe), "error"); logError("إنشاء البروفايل", pe); return; }
-  }
-  showMsg(msg, "تم إنشاء الحساب! سجّلي دخولك الآن", "ok");
-  showToast("✅ تم إنشاء الحساب بنجاح", "ok");
-  setTimeout(() => switchAuthTab("login"), 1200);
-}
 
 async function handleLogin(e){
   e.preventDefault();
@@ -231,13 +183,7 @@ async function handleLogin(e){
   window.location.reload();
 }
 
-function switchAuthTab(tab){
-  document.getElementById("tab-login").classList.toggle("active", tab === "login");
-  document.getElementById("tab-signup").classList.toggle("active", tab === "signup");
-  document.getElementById("login-form").hidden  = tab !== "login";
-  document.getElementById("signup-form").hidden = tab !== "signup";
-}
-function openAuthModal(tab){ document.getElementById("auth-overlay").classList.add("open"); switchAuthTab(tab || "login"); }
+function openAuthModal(){ document.getElementById("auth-overlay").classList.add("open"); }
 function closeAuthModal(){ document.getElementById("auth-overlay").classList.remove("open"); }
 
 function watchOwnerField(){
@@ -251,7 +197,6 @@ function watchOwnerField(){
 async function logout(e){
   if (e?.preventDefault) e.preventDefault();
   if (e?.stopPropagation) e.stopPropagation();
-  if (MESSAGES_UNSUB){ try { MESSAGES_UNSUB(); } catch(_){} MESSAGES_UNSUB = null; }
   try { await supabaseClient.auth.signOut({ scope: "global" }); } catch(err){ console.error(err); }
   try {
     Object.keys(localStorage).forEach(k => {
@@ -368,7 +313,6 @@ async function openSupportPanel(recipientRole = "support"){
 
 function closeSupportPanel(){
   document.getElementById("support-overlay").classList.remove("open");
-  if (MESSAGES_UNSUB){ try { MESSAGES_UNSUB(); } catch(_){} MESSAGES_UNSUB = null; }
 }
 
 async function loadMessages(recipientRole){
@@ -1188,7 +1132,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   applyLanguage(localStorage.getItem("basetna_lang") || "ar");
   document.querySelectorAll(".lang-switch").forEach(btn => btn.addEventListener("click", toggleLanguage));
   document.getElementById("login-form")?.addEventListener("submit", handleLogin);
-  document.getElementById("signup-form")?.addEventListener("submit", handleSignup);
   document.getElementById("settings-form")?.addEventListener("submit", saveSettings);
   document.querySelectorAll(".logout").forEach(el => el.addEventListener("click", logout));
   watchOwnerField();

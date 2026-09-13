@@ -19,8 +19,7 @@
       <div class="brand"><span class="mark">EN</span> بسّطنا الإنجليزي</div>
       <div class="topbar-actions">
         <button class="lang-switch">English</button>
-        <button class="btn btn-outline btn-sm" onclick="openAuthModal('login')" data-i18n data-ar="تسجيل الدخول" data-en="Log in"></button>
-        <button class="btn btn-gold btn-sm" onclick="openAuthModal('signup')" data-i18n data-ar="اشترك الآن" data-en="Join now"></button>
+        <button class="btn btn-gold btn-sm" onclick="openAuthModal('login')" data-i18n data-ar="تسجيل الدخول" data-en="Log in"></button>
       </div>
     </div>
   </div>
@@ -32,7 +31,7 @@
         <h1 data-i18n data-ar="الإنجليزي يبقى سهل وبسيط مع مس. شيرهان" data-en="English becomes simple with ms. sherehan"></h1>
         <p class="lead" data-i18n data-ar="كورسات مرتبة على حسب مرحلتك الدراسية، فيديوهات وملفات في مكان واحد، ومتابعة مباشرة من مس. شيرهان." data-en="Courses organized by your stage, videos and files in one place."></p>
         <div class="hero-actions">
-          <button class="btn btn-gold" onclick="openAuthModal('signup')" data-i18n data-ar="ابدأ رحلتك الآن" data-en="Start your journey"></button>
+          <button class="btn btn-gold" onclick="openAuthModal('login')" data-i18n data-ar="تسجيل الدخول" data-en="Log in"></button>
           <a class="btn btn-outline" href="#packages" data-i18n data-ar="شوف الباقات" data-en="See packages"></a>
         </div>
       </div>
@@ -74,16 +73,13 @@
     </div>
   </footer>
 
-  <!-- Auth Modal -->
+  <!-- Auth Modal — تسجيل الدخول فقط -->
   <div class="overlay" id="auth-overlay">
     <div class="modal">
       <button class="close" onclick="closeAuthModal()">✕</button>
-      <div class="tabs">
-        <button id="tab-login" class="active" onclick="switchAuthTab('login')" data-i18n data-ar="تسجيل الدخول" data-en="Log in"></button>
-        <button id="tab-signup" onclick="switchAuthTab('signup')" data-i18n data-ar="حساب جديد" data-en="Sign up"></button>
-      </div>
       <form id="login-form">
-        <h3 data-i18n data-ar="أهلاً بيك تاني" data-en="Welcome back"></h3>
+        <h3 data-i18n data-ar="تسجيل الدخول" data-en="Log in"></h3>
+        <p class="sub" data-i18n data-ar="أهلاً بيك تاني 👋" data-en="Welcome back 👋"></p>
         <div class="field">
           <label data-i18n data-ar="البريد الإلكتروني / اسم المستخدم" data-en="Email / Username"></label>
           <input type="text" id="li-username" required>
@@ -98,15 +94,6 @@
         </div>
         <button class="btn btn-gold btn-block" type="submit" data-i18n data-ar="دخول" data-en="Log in"></button>
         <div class="form-msg" id="login-msg"></div>
-      </form>
-      <form id="signup-form" hidden>
-        <h3 data-i18n data-ar="إنشاء حساب" data-en="Create account"></h3>
-        <div class="field"><label data-i18n data-ar="الاسم بالكامل" data-en="Full name"></label><input type="text" id="su-name" required></div>
-        <div class="field"><label data-i18n data-ar="البريد الإلكتروني" data-en="Email"></label><input type="email" id="su-email" required></div>
-        <div class="field"><label data-i18n data-ar="رقم الهاتف" data-en="Phone"></label><input type="tel" id="su-phone"></div>
-        <div class="field"><label data-i18n data-ar="كلمة المرور" data-en="Password"></label><input type="password" id="su-password" required></div>
-        <button class="btn btn-gold btn-block" type="submit" data-i18n data-ar="إنشاء الحساب" data-en="Create account"></button>
-        <div class="form-msg" id="signup-msg"></div>
       </form>
     </div>
   </div>

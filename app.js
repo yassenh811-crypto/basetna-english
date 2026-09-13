@@ -1,6 +1,65 @@
 /* ============================================================
    بسّطنا الإنجليزي — app.js v8 (النهائي)
    ============================================================ */
+   /* ============================================================
+   🛡️ حماية: لو localStorage مش متاح، استخدم بديل في الذاكرة
+   (يحل مشكلة "Access is denied for localStorage" على بعض المتصفحات)
+   ============================================================ */
+(function ensureStorageSafe(){
+  function makeMemoryStorage(){
+    const mem = {};
+    return {
+      getItem: (k) => (k in mem ? mem[k] : null),
+      setItem: (k, v) => { mem[k] = String(v); },
+      removeItem: (k) => { delete mem[k]; },
+      clear: () => { Object.keys(mem).forEach(k => delete mem[k]); },
+      key: (i) => Object.keys(mem)[i] || null,
+      get length(){ return Object.keys(mem).length; }
+    };
+  }
+
+  // اختبار localStorage
+  let lsOk = false;
+  try {
+    localStorage.setItem("__test__", "1");
+    localStorage.removeItem("__test__");
+    lsOk = true;
+  } catch(e){ lsOk = false; }
+
+  if (!lsOk){
+    console.warn("⚠️ localStorage مش متاح — استخدام بديل في الذاكرة");
+    try {
+      Object.defineProperty(window, "localStorage", {
+        configurable: true,
+        value: makeMemoryStorage()
+      });
+    } catch(e){
+      // لو حتى defineProperty فشلت، استخدم متغير داخلي
+      window.__memStorage = makeMemoryStorage();
+      window.localStorage = window.__memStorage;
+    }
+  }
+
+  // اختبار sessionStorage
+  let ssOk = false;
+  try {
+    sessionStorage.setItem("__test__", "1");
+    sessionStorage.removeItem("__test__");
+    ssOk = true;
+  } catch(e){ ssOk = false; }
+
+  if (!ssOk){
+    console.warn("⚠️ sessionStorage مش متاح — استخدام بديل في الذاكرة");
+    try {
+      Object.defineProperty(window, "sessionStorage", {
+        configurable: true,
+        value: makeMemoryStorage()
+      });
+    } catch(e){
+      window.sessionStorage = makeMemoryStorage();
+    }
+  }
+})();
 
 const SUPABASE_URL      = "https://wgostqkywpybmzgbyzeo.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_zx0zeWR2bpbmyO90oN-4ow_FxZCSPl8";

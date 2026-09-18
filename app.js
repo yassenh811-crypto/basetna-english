@@ -1,5 +1,10 @@
 /* ============================================================
-   بسّطنا الإنجليزي — app.js v22 (كامل نهائي)
+   بسّطنا الإنجليزي — app.js v23 (كامل)
+   - Welcome Modal (عزيز/عزيزة) — مرة واحدة بس
+   - ياسين superadmin + Role Picker
+   - كورسات = سلسلة فيديوهات
+   - تقييمات + بحث + تقارير
+   - رفع فيديو من الموبايل
    ============================================================ */
 (function(){
   function makeMem(){
@@ -15,6 +20,9 @@
   if(!test(window.sessionStorage)){try{Object.defineProperty(window,"sessionStorage",{configurable:true,value:makeMem()});}catch(e){window.sessionStorage=makeMem();}}
 })();
 
+/* ============================================================
+   ⚙️ إعدادات
+   ============================================================ */
 const SUPABASE_URL = "https://wgostqkywpybmzgbyzeo.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_zx0zeWR2bpbmyO90oN-4ow_FxZCSPl8";
 const OWNER_USERNAME_MAP = {"yassen":"yassenq14232@gmail.com","shere":"shere@basetna-english.com"};
@@ -28,10 +36,22 @@ let CURRENT_PROFILE = null;
 let ALL_CONTACTS = [];
 let VIEW_MODE = localStorage.getItem("basetna_view_mode") || null;
 let ALL_COURSES_CACHE = [];
-let USER_GENDER = localStorage.getItem("basetna_gender") || null;
+
+/* قراءة الجندر من أي مكان (localStorage أو Cookie) */
+let USER_GENDER = (function(){
+  try {
+    const g = localStorage.getItem("basetna_gender");
+    if(g === "female" || g === "male") return g;
+  } catch(e){}
+  try {
+    const match = document.cookie.match(/basetna_gender=(female|male)/);
+    if(match) return match[1];
+  } catch(e){}
+  return null;
+})();
 
 /* ============================================================
-   Toast & Errors
+   Toast + Errors
    ============================================================ */
 function ensureToastEl(){let el=document.getElementById("global-toast");if(!el){el=document.createElement("div");el.id="global-toast";el.className="global-toast";document.body.appendChild(el);}return el;}
 function showToast(msg,type="error",duration=6000){const el=ensureToastEl();el.className="global-toast show "+type;el.textContent=msg;clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>el.classList.remove("show"),duration);}
@@ -59,7 +79,7 @@ function logOk(ctx,msg){console.log(`✅ [${ctx}]`,msg||"");if(msg)showToast(`�
 function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 /* ============================================================
-   Countries
+   الدول العربية
    ============================================================ */
 const ARAB_COUNTRIES = [
   {dial:"20",ar:"مصر",en:"Egypt"},{dial:"966",ar:"السعودية",en:"Saudi Arabia"},
@@ -88,7 +108,7 @@ function splitFullPhone(full){
 }
 
 /* ============================================================
-   Language
+   اللغة
    ============================================================ */
 function applyLanguage(lang){
   document.documentElement.lang=lang;
@@ -114,13 +134,21 @@ function hideSupportFabsForRole(){document.querySelectorAll(".support-fab").forE
 function showMsg(el,text,type){el.textContent=text;el.className="form-msg "+type;}
 
 /* ============================================================
-   👋 Welcome Modal (عزيز / عزيزة)
+   👋 Welcome Modal (عزيز / عزيزة) — مرة واحدة بس
    ============================================================ */
 function pickGender(gender){
   USER_GENDER = gender;
-  localStorage.setItem("basetna_gender", gender);
+
+  // نخزّن في مكانين للأمان
+  try { localStorage.setItem("basetna_gender", gender); } catch(e){}
+  try {
+    document.cookie = "basetna_gender=" + gender + "; max-age=31536000; path=/; SameSite=Lax";
+  } catch(e){}
+
+  // نخفي المودال
   const overlay = document.getElementById("welcome-overlay");
   if(overlay) overlay.classList.remove("open");
+
   updateWelcomeText();
   showToast(gender === "female"
     ? "👸 أهلاً بيكِ يا عزيزة 💛"
@@ -134,27 +162,42 @@ function updateWelcomeText(){
   const greetEmoji = isFemale ? "👸" : "🤵";
 
   const welcomeMsg = document.getElementById("welcome-msg");
-  if(welcomeMsg){
-    const name = CURRENT_PROFILE?.full_name || "";
-    welcomeMsg.textContent = name
-      ? `${greetEmoji} أهلاً بيك${isFemale ? "ِ" : ""} يا ${greetWord} ${name}`
-      : `${greetEmoji} أهلاً بيك${isFemale ? "ِ" : ""} يا ${greetWord}`;
+  if(welcomeMsg && CURRENT_PROFILE){
+    welcomeMsg.textContent = `${greetEmoji} أهلاً بيك${isFemale ? "ِ" : ""} يا ${greetWord} ${CURRENT_PROFILE.full_name}`;
   }
 
   const heroTitle = document.getElementById("hero-title");
-  if(heroTitle && !CURRENT_PROFILE){
+  if(heroTitle && !CURRENT_PROFILE && USER_GENDER){
     heroTitle.textContent = isFemale
       ? "الإنجليزي يبقى سهل وبسيط يا عزيزة 💛"
       : "الإنجليزي يبقى سهل وبسيط يا عزيز 💛";
   }
 }
 
+function getStoredGender(){
+  try {
+    const g = localStorage.getItem("basetna_gender");
+    if(g === "female" || g === "male") return g;
+  } catch(e){}
+  try {
+    const match = document.cookie.match(/basetna_gender=(female|male)/);
+    if(match) return match[1];
+  } catch(e){}
+  return null;
+}
+
 function showWelcomeModalIfNeeded(){
-  if(USER_GENDER){
+  const storedGender = getStoredGender();
+
+  if(storedGender){
+    USER_GENDER = storedGender;
     const overlay = document.getElementById("welcome-overlay");
     if(overlay) overlay.classList.remove("open");
+    updateWelcomeText();
     return false;
   }
+
+  // أول مرة → اعرض المودال
   const overlay = document.getElementById("welcome-overlay");
   if(overlay) overlay.classList.add("open");
   return true;
@@ -1163,7 +1206,7 @@ async function loadStudentDashboard(profile){
    Init
    ============================================================ */
 async function initApp(){
-  // أول حاجة: عرض مودال الترحيب لو أول مرة
+  // عرض مودال الترحيب لو أول مرة
   showWelcomeModalIfNeeded();
 
   const {data:{session},error:sessErr}=await supabaseClient.auth.getSession();

@@ -1,5 +1,5 @@
 /* ============================================================
-   بسّطنا الإنجليزي — style.css v15 (كامل)
+   بسّطنا الإنجليزي — style.css v16 (كامل)
    ============================================================ */
 :root{
   --navy:#122A4D;--navy-deep:#0B1D38;--navy-mid:#1B3B66;
@@ -73,7 +73,7 @@ input,select,textarea{font-family:var(--font);}
 .hero-visual .stat span{color:#C9D2E0;font-size:14px;}
 
 /* ============================================================
-   SEARCH BOX (تصميم جديد)
+   SEARCH BOX
    ============================================================ */
 .search-box{position:relative;max-width:560px;margin:0 auto;}
 .search-box input{width:100%;padding:16px 52px 16px 56px;font-size:15px;border:2px solid var(--line);border-radius:999px;background:#fff;transition:all .3s cubic-bezier(.4,0,.2,1);box-shadow:0 4px 14px rgba(11,29,56,.06);}
@@ -128,7 +128,7 @@ section.block{padding:clamp(48px,8vw,76px) 0;}
 .form-msg.ok{display:block;background:#E4F2EC;color:var(--teal);}
 
 /* ============================================================
-   👋 WELCOME MODAL (اختيار عزيز/عزيزة)
+   👋 WELCOME MODAL
    ============================================================ */
 .welcome-modal{max-width:440px;text-align:center;padding:clamp(26px,5vw,36px) clamp(20px,4vw,30px);}
 .welcome-logo{font-size:56px;margin-bottom:14px;animation:pulse 2s infinite;}

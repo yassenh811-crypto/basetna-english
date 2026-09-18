@@ -12,7 +12,7 @@
 <body>
 
 <!-- ============================================================
-     PUBLIC VIEW
+     VIEW 1: PUBLIC
      ============================================================ -->
 <div id="view-public">
   <div class="topbar">
@@ -44,12 +44,10 @@
     </div>
   </section>
 
-  <!-- البحث في الكورسات -->
-  <section class="block" id="search-section">
+  <section class="block" id="search-section" style="padding:30px 0;">
     <div class="container">
       <div class="search-box">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="search-input" placeholder="ابحث في الكورسات..." oninput="filterCourses()">
+        <input type="text" id="search-input" placeholder="🔍 ابحث في الكورسات..." oninput="filterCourses()">
       </div>
     </div>
   </section>
@@ -120,7 +118,7 @@
 </div>
 
 <!-- ============================================================
-     OWNER / SUPPORT DASHBOARD
+     VIEW 2: OWNER / SUPPORT DASHBOARD
      ============================================================ -->
 <div id="view-owner" hidden>
   <div class="dash-shell">
@@ -222,7 +220,7 @@
 </div>
 
 <!-- ============================================================
-     STUDENT DASHBOARD
+     VIEW 3: STUDENT DASHBOARD
      ============================================================ -->
 <div id="view-student" hidden>
   <div class="dash-shell">
@@ -241,9 +239,8 @@
         <p style="margin:0 0 12px;">مفيش اشتراك فعّال. تواصلي مع مس. شيرهان.</p>
         <a href="#" id="no-sub-wa-btn" class="btn btn-teal" target="_blank">تواصل على واتساب</a>
       </div>
-      <div class="search-box" style="margin-bottom:20px;">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="student-search-input" placeholder="ابحث في كورساتك..." oninput="filterStudentCourses()">
+      <div class="search-box" style="margin-bottom:20px;max-width:100%;">
+        <input type="text" id="student-search-input" placeholder="🔍 ابحث في كورساتك..." oninput="filterStudentCourses()">
       </div>
       <div class="grid grid-3" id="courses-grid"></div>
     </main>
@@ -260,7 +257,7 @@
 </div>
 
 <!-- ============================================================
-     SUPPORT MODAL
+     SUPPORT CHAT MODAL
      ============================================================ -->
 <div class="overlay" id="support-overlay">
   <div class="support-modal">

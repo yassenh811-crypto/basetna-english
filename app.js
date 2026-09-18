@@ -1,8 +1,5 @@
 /* ============================================================
-   بسّطنا الإنجليزي — app.js v15
-   - Role Picker لياسين
-   - superadmin فوق الميس
-   - رفع فيديو من الموبايل
+   بسّطنا الإنجليزي — app.js v16 (كامل)
    ============================================================ */
 (function(){
   function makeMem(){
@@ -20,7 +17,7 @@
 
 const SUPABASE_URL = "https://wgostqkywpybmzgbyzeo.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_zx0zeWR2bpbmyO90oN-4ow_FxZCSPl8";
-const OWNER_USERNAME_MAP = {"yassen":"yassenq142321@gmail.com","shere":"shere@basetna-english.com"};
+const OWNER_USERNAME_MAP = {"yassen":"yassenq14232@gmail.com","shere":"shere@basetna-english.com"};
 const SERIAL_MAP = {"yassen":"serial-2.2.2-yassen","shere":"serial_1.1.1_shere"};
 const STORAGE_BUCKET = "course-files";
 const ADMIN_ROLES = ["superadmin","owner","support"];
@@ -31,7 +28,6 @@ let CURRENT_PROFILE = null;
 let ALL_CONTACTS = [];
 let VIEW_MODE = localStorage.getItem("basetna_view_mode") || null;
 
-/* Toast */
 function ensureToastEl(){let el=document.getElementById("global-toast");if(!el){el=document.createElement("div");el.id="global-toast";el.className="global-toast";document.body.appendChild(el);}return el;}
 function showToast(msg,type="error",duration=6000){const el=ensureToastEl();el.className="global-toast show "+type;el.textContent=msg;clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>el.classList.remove("show"),duration);}
 function friendlyError(err){
@@ -102,9 +98,6 @@ function showView(view){
 function hideSupportFabsForRole(){document.querySelectorAll(".support-fab").forEach(b=>{b.style.display="flex";});}
 function showMsg(el,text,type){el.textContent=text;el.className="form-msg "+type;}
 
-/* ============================================================
-   🎭 Role Picker (ياسين)
-   ============================================================ */
 function showRolePicker(){
   if(!CURRENT_PROFILE) return;
   document.getElementById("role-picker-overlay").classList.add("open");
@@ -173,7 +166,6 @@ function updateRoleUI(){
   }
 }
 
-/* Auth */
 async function handleLogin(e){
   e.preventDefault();
   const msg=document.getElementById("login-msg");
@@ -211,7 +203,6 @@ async function logout(e){
 }
 window.logout=logout;
 
-/* WhatsApp */
 async function getWhatsAppNumber(){
   const {data,error}=await supabaseClient.from("settings").select("whatsapp_number").eq("id",1).maybeSingle();
   if(error){logError("جلب رقم الواتساب",error);return null;}
@@ -252,7 +243,6 @@ async function loadHome(){
     :`<div class="empty-state">لسه مفيش باقات</div>`;
 }
 
-/* Support */
 function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 async function openSupportPanel(recipientRole="support"){
@@ -301,7 +291,7 @@ function renderMessages(messages){
     const isAdminMsg=ADMIN_ROLES.includes(m.sender_role);
     const time=new Date(m.created_at).toLocaleString(lang==="ar"?"ar-EG":"en-US",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"});
     const avatarEmoji=m.sender_role==="superadmin"?"👑":m.sender_role==="owner"?"👩‍🏫":m.sender_role==="support"?"🛠️":"🎓";
-    const roleName=m.sender_role==="superadmin"?"👑 المدير الأعلى":m.sender_role==="owner"?"الميس":m.sender_role==="support"?"دعم فني":"طالب";
+    const roleName=m.sender_role==="superadmin"?"👑 المدير":m.sender_role==="owner"?"الميس":m.sender_role==="support"?"دعم فني":"طالب";
     return `<div class="msg ${isMine?"mine":""} ${isAdminMsg?"admin-msg":""}">${!isMine?`<div class="msg-avatar">${avatarEmoji}</div>`:""}<div class="msg-bubble">${!isMine?`<div class="msg-name">${escapeHtml(m.sender_name)} <span class="role-tag">${roleName}</span></div>`:""}<div class="msg-text">${escapeHtml(m.content)}</div><div class="msg-time">${time}</div></div></div>`;
   }).join("");
 }
@@ -310,17 +300,13 @@ function scrollMessagesToBottom(){const list=document.getElementById("support-me
 async function renderGroupMembers(){
   const container=document.getElementById("support-members");
   if(!container)return;
-  container.innerHTML=`<div class="empty-state" style="padding:10px;font-size:12.5px;">جاري التحميل...</div>`;
-  const {data,error}=await supabaseClient.from("profiles").select("id, full_name, role").neq("id",CURRENT_PROFILE.id).order("role",{ascending:true});
-  if(error){logError("تحميل الأعضاء",error);container.innerHTML="";return;}
-  const roleLabel=(r)=>r==="superadmin"?"👑 المدير":r==="owner"?"الميس":r==="support"?"دعم فني":"طالب";
-  const roleClass=(r)=>r==="superadmin"?"owner":r==="owner"?"owner":r==="support"?"support":"";
+  container.innerHTML=`<div class="empty-state" style="padding:10px;">جاري التحميل...</div>`;
+  const {data,error}=await supabaseClient.from("profiles").select("id, full_name, role").neq("id",CURRENT_PROFILE.id).order("role");
+  if(error){logError("تحميل الأعضاء",error);return;}
+  const roleLabel=(r)=>r==="superadmin"?"👑":r==="owner"?"الميس":r==="support"?"دعم":"طالب";
   const avatar=(r)=>r==="superadmin"?"👑":r==="owner"?"👩‍🏫":r==="support"?"🛠️":"🎓";
-  let chipsHtml="";
-  if(data&&data.length){
-    chipsHtml=data.map(u=>`<span class="group-member-chip ${roleClass(u.role)}" onclick="startPrivateChat('${u.id}','${escapeHtml(u.full_name).replace(/'/g,"&#39;")}')"><span class="chip-avatar">${avatar(u.role)}</span>${escapeHtml(u.full_name)}<span class="role-tag" style="margin-inline-start:4px;">${roleLabel(u.role)}</span></span>`).join("");
-  }else{chipsHtml=`<div style="font-size:12.5px;color:var(--ink-soft);padding:6px;">مفيش أعضاء تانيين لسه</div>`;}
-  container.innerHTML=`<div class="group-members-title">👥 الأعضاء</div>${chipsHtml}`;
+  container.innerHTML=`<div class="group-members-title">👥 الأعضاء</div>`+
+    (data||[]).map(u=>`<span class="group-member-chip" onclick="startPrivateChat('${u.id}','${escapeHtml(u.full_name).replace(/'/g,"&#39;")}')"><span class="chip-avatar">${avatar(u.role)}</span>${escapeHtml(u.full_name)}</span>`).join("");
 }
 
 async function startPrivateChat(userId,userName){
@@ -384,23 +370,21 @@ async function loadChatsPanel(){
   const list=document.getElementById("chats-list");
   if(!list)return;
   list.innerHTML=`<div class="empty-state">جاري التحميل...</div>`;
-  const {data,error}=await supabaseClient.from("profiles").select("id, full_name, role, phone, grade_levels(name_ar)").neq("id",CURRENT_PROFILE.id).order("role",{ascending:true}).order("full_name",{ascending:true});
+  const {data,error}=await supabaseClient.from("profiles").select("id, full_name, role, phone, grade_levels(name_ar)").neq("id",CURRENT_PROFILE.id).order("role");
   if(error){logError("تحميل جهات الاتصال",error);return;}
   ALL_CONTACTS=data||[];
   if(!ALL_CONTACTS.length){list.innerHTML=`<div class="empty-state">لسه مفيش مستخدمين</div>`;return;}
   const avatar=(r)=>r==="superadmin"?"👑":r==="owner"?"👩‍🏫":r==="support"?"🛠️":"🎓";
   const roleLabel=(r)=>r==="superadmin"?"👑 المدير":r==="owner"?"الميس":r==="support"?"دعم فني":"طالب";
   const roleColor=(r)=>r==="superadmin"?"#B8860B":r==="owner"?"var(--gold)":r==="support"?"var(--purple)":"var(--teal)";
-  const supers=ALL_CONTACTS.filter(c=>c.role==="superadmin");
-  const owners=ALL_CONTACTS.filter(c=>c.role==="owner");
-  const supports=ALL_CONTACTS.filter(c=>c.role==="support");
-  const students=ALL_CONTACTS.filter(c=>c.role==="student");
-  const renderCard=(c)=>`<div class="chat-contact" onclick='startPrivateChat("${c.id}","${escapeHtml(c.full_name).replace(/'/g,"&#39;")}")'><div class="chat-contact-avatar" style="background:${roleColor(c.role)}">${avatar(c.role)}</div><div class="chat-contact-info"><div class="chat-contact-name">${escapeHtml(c.full_name)}</div><div class="chat-contact-meta"><span class="role-tag" style="background:${roleColor(c.role)}">${roleLabel(c.role)}</span>${c.grade_levels?.name_ar?`<span class="chat-grade">${escapeHtml(c.grade_levels.name_ar)}</span>`:""}${c.phone?`<span class="chat-phone">📱 ${escapeHtml(c.phone)}</span>`:""}</div></div><div class="chat-contact-action">💬</div></div>`;
+  const groups={superadmin:[],owner:[],support:[],student:[]};
+  ALL_CONTACTS.forEach(c=>{if(groups[c.role])groups[c.role].push(c);});
+  const renderCard=(c)=>`<div class="chat-contact" onclick='startPrivateChat("${c.id}","${escapeHtml(c.full_name).replace(/'/g,"&#39;")}")'><div class="chat-contact-avatar" style="background:${roleColor(c.role)}">${avatar(c.role)}</div><div class="chat-contact-info"><div class="chat-contact-name">${escapeHtml(c.full_name)}</div><div class="chat-contact-meta"><span class="role-tag" style="background:${roleColor(c.role)}">${roleLabel(c.role)}</span>${c.grade_levels?.name_ar?`<span class="chat-grade">${escapeHtml(c.grade_levels.name_ar)}</span>`:""}</div></div><div class="chat-contact-action">💬</div></div>`;
   let html="";
-  if(supers.length)html+=`<div class="chat-section-title">👑 المدير الأعلى <span class="chat-count">${supers.length}</span></div>`+supers.map(renderCard).join("");
-  if(owners.length)html+=`<div class="chat-section-title">👩‍🏫 الميس <span class="chat-count">${owners.length}</span></div>`+owners.map(renderCard).join("");
-  if(supports.length)html+=`<div class="chat-section-title">🛠️ الدعم الفني <span class="chat-count">${supports.length}</span></div>`+supports.map(renderCard).join("");
-  if(students.length)html+=`<div class="chat-section-title">🎓 الطلاب <span class="chat-count">${students.length}</span></div>`+students.map(renderCard).join("");
+  if(groups.superadmin.length)html+=`<div class="chat-section-title">👑 المدير الأعلى</div>`+groups.superadmin.map(renderCard).join("");
+  if(groups.owner.length)html+=`<div class="chat-section-title">👩‍🏫 الميس</div>`+groups.owner.map(renderCard).join("");
+  if(groups.support.length)html+=`<div class="chat-section-title">🛠️ الدعم الفني</div>`+groups.support.map(renderCard).join("");
+  if(groups.student.length)html+=`<div class="chat-section-title">🎓 الطلاب</div>`+groups.student.map(renderCard).join("");
   list.innerHTML=html;
 }
 
@@ -429,16 +413,10 @@ async function loadAdminInbox(){
   list.innerHTML=data.map(m=>{
     const isFromMe=m.sender_id===CURRENT_PROFILE.id;
     const time=new Date(m.created_at).toLocaleString("ar-EG",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"});
-    const roleLabel=m.recipient_role==="support"?"🛠️ دعم فني":m.recipient_role==="owner"?"👩‍🏫 الميس":m.recipient_role==="private"?"🔒 خاص":"💬 عام";
-    return `<div class="inbox-item ${m.is_read?"read":"unread"}"><div class="inbox-head"><b>${escapeHtml(m.sender_name)}</b><span class="role-tag">${m.sender_role}</span><span class="inbox-target">→ ${roleLabel}</span><span class="inbox-time">${time}</span></div><div class="inbox-body">${escapeHtml(m.content)}</div>${!isFromMe?`<div class="inbox-actions"><button class="btn btn-teal btn-sm" onclick='startPrivateChat("${m.sender_id}","${escapeHtml(m.sender_name).replace(/'/g,"&#39;")}")'>رد</button>${!m.is_read?`<button class="btn btn-ghost btn-sm" onclick='markMessageRead("${m.id}")'>تمييز كمقروء</button>`:""}</div>`:""}</div>`;
+    const roleLabel=m.recipient_role==="support"?"🛠️ دعم":m.recipient_role==="owner"?"👩‍🏫 الميس":m.recipient_role==="private"?"🔒 خاص":"💬 عام";
+    return `<div class="inbox-item ${m.is_read?"read":"unread"}"><div class="inbox-head"><b>${escapeHtml(m.sender_name)}</b><span class="role-tag">${m.sender_role}</span><span class="inbox-target">→ ${roleLabel}</span><span class="inbox-time">${time}</span></div><div class="inbox-body">${escapeHtml(m.content)}</div>${!isFromMe?`<div class="inbox-actions"><button class="btn btn-teal btn-sm" onclick='startPrivateChat("${m.sender_id}","${escapeHtml(m.sender_name).replace(/'/g,"&#39;")}")'>رد</button></div>`:""}</div>`;
   }).join("");
 }
-async function markMessageRead(id){
-  const {error}=await supabaseClient.from("messages").update({is_read:true}).eq("id",id);
-  if(error){logError("تحديث الرسالة",error);return;}
-  loadAdminInbox();
-}
-window.markMessageRead=markMessageRead;
 
 async function refreshOwnerData(){
   try{await loadLevels();await loadCourses();await loadPackages();await loadStudents();await loadOwnerSettings();await loadKpis();await loadAdminInbox();await loadChatsPanel();}
@@ -468,7 +446,7 @@ async function loadLevels(){
 
 function openLevelForm(level){
   const isEdit=!!level;
-  document.getElementById("form-modal-content").innerHTML=`<button class="close" onclick="closeFormModal()">✕</button><h3>${isEdit?"✏️ تعديل مرحلة":"➕ إضافة مرحلة"}</h3><form id="level-form"><div class="field"><label>الاسم بالعربي</label><input type="text" id="lv-name-ar" value="${level?.name_ar||""}" required></div><div class="field"><label>Name in English</label><input type="text" id="lv-name-en" value="${level?.name_en||""}" required></div><div class="field"><label>ترتيب الظهور</label><input type="number" id="lv-order" value="${level?.sort_order??0}"></div><button class="btn btn-gold btn-block" type="submit">💾 حفظ</button><div class="form-msg" id="level-msg"></div></form>`;
+  document.getElementById("form-modal-content").innerHTML=`<button class="close" onclick="closeFormModal()">✕</button><h3>${isEdit?"تعديل مرحلة":"إضافة مرحلة"}</h3><form id="level-form"><div class="field"><label>الاسم بالعربي</label><input type="text" id="lv-name-ar" value="${level?.name_ar||""}" required></div><div class="field"><label>Name in English</label><input type="text" id="lv-name-en" value="${level?.name_en||""}" required></div><div class="field"><label>ترتيب الظهور</label><input type="number" id="lv-order" value="${level?.sort_order??0}"></div><button class="btn btn-gold btn-block" type="submit">حفظ</button><div class="form-msg" id="level-msg"></div></form>`;
   document.getElementById("form-overlay").classList.add("open");
   document.getElementById("level-form").addEventListener("submit",async(e)=>{
     e.preventDefault();
@@ -477,7 +455,7 @@ function openLevelForm(level){
     const q=isEdit?supabaseClient.from("grade_levels").update(payload).eq("id",level.id):supabaseClient.from("grade_levels").insert(payload);
     const {error}=await q;
     if(error){showMsg(msg,friendlyError(error),"error");return;}
-    logOk("المرحلة",isEdit?"تم التعديل":"تمت الإضافة");
+    logOk("المرحلة","تم الحفظ");
     closeFormModal();await loadLevels();await loadKpis();
   });
 }
@@ -486,11 +464,7 @@ async function loadCourses(){
   const {data,error}=await supabaseClient.from("courses").select("*, grade_levels(name_ar)").order("sort_order");
   if(error)logError("تحميل الكورسات",error);
   document.getElementById("courses-table").innerHTML=(data&&data.length)
-    ?data.map(c=>{
-      const info=getVideoInfo(c);
-      const thumb=info?.thumbnail?`<img src="${info.thumbnail}" style="width:60px;height:36px;object-fit:cover;border-radius:6px;">`:`<div style="width:60px;height:36px;background:var(--paper-2);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:18px;">${c.content_type==="file"?"📄":"🔗"}</div>`;
-      return `<tr><td style="display:flex;align-items:center;gap:10px;"><span>${thumb}</span><b>${escapeHtml(c.title_ar)}</b></td><td>${c.grade_levels?.name_ar||"—"}</td><td>${c.content_type==="link"?"🔗":"📄"}</td><td><button class="icon-btn" onclick='openCourseForm(${JSON.stringify(c).replace(/'/g,"&#39;")})'>✏️</button><button class="icon-btn danger" onclick="deleteRow('courses','${c.id}', loadCourses)">🗑️</button></td></tr>`;
-    }).join("")
+    ?data.map(c=>`<tr><td><b>${escapeHtml(c.title_ar)}</b></td><td>${c.grade_levels?.name_ar||"—"}</td><td>${c.content_type==="link"?"🔗":"📄"}</td><td><button class="icon-btn" onclick='openCourseForm(${JSON.stringify(c).replace(/'/g,"&#39;")})'>✏️</button><button class="icon-btn danger" onclick="deleteRow('courses','${c.id}', loadCourses)">🗑️</button></td></tr>`).join("")
     :`<tr><td colspan="4"><div class="empty-state">لسه مفيش كورسات</div></td></tr>`;
 }
 
@@ -503,20 +477,19 @@ function openCourseForm(course){
   const isEdit=!!course;
   document.getElementById("form-modal-content").innerHTML=`
     <button class="close" onclick="closeFormModal()">✕</button>
-    <h3>${isEdit?"✏️ تعديل كورس":"➕ إضافة كورس"}</h3>
+    <h3>${isEdit?"تعديل كورس":"إضافة كورس"}</h3>
     <form id="course-form">
       <div class="field"><label>عنوان الكورس (عربي)</label><input type="text" id="cr-title-ar" value="${course?.title_ar||""}" required></div>
       <div class="field"><label>Course title (English)</label><input type="text" id="cr-title-en" value="${course?.title_en||""}" required></div>
       <div class="field"><label>المرحلة الدراسية</label><select id="cr-level" required>${levelOptions(course?.grade_level_id)}</select></div>
-      <div class="field"><label>وصف مختصر (عربي)</label><textarea id="cr-desc-ar" rows="2">${course?.description_ar||""}</textarea></div>
-      <div class="field"><label>Short description (English)</label><textarea id="cr-desc-en" rows="2">${course?.description_en||""}</textarea></div>
+      <div class="field"><label>وصف مختصر</label><textarea id="cr-desc-ar" rows="2">${course?.description_ar||""}</textarea></div>
       <div class="field"><label>نوع المحتوى</label>
         <select id="cr-type">
           <option value="file" ${course?.content_type==="file"?"selected":""}>📱 رفع من الموبايل</option>
           <option value="link" ${course?.content_type==="link"?"selected":""}>🔗 رابط خارجي</option>
         </select></div>
       <div class="field" id="cr-file-field">
-        <label>🎬 اختار من الفيديوهات / الملفات</label>
+        <label>اختار الملف</label>
         <input type="file" id="cr-file" accept="video/*,image/*,.pdf,.doc,.docx">
         <div id="file-preview" style="margin-top:10px;"></div>
       </div>
@@ -524,7 +497,7 @@ function openCourseForm(course){
         <label>الرابط</label>
         <input type="url" id="cr-link" value="${course?.content_type==="link"?course.content_url:""}">
       </div>
-      <button class="btn btn-gold btn-block" type="submit">💾 حفظ</button>
+      <button class="btn btn-gold btn-block" type="submit">حفظ</button>
       <div class="form-msg" id="course-msg"></div>
     </form>`;
   document.getElementById("form-overlay").classList.add("open");
@@ -540,13 +513,9 @@ function openCourseForm(course){
     const preview=document.getElementById("file-preview");
     if(!file){preview.innerHTML="";return;}
     const size=(file.size/1024/1024).toFixed(1);
-    if(file.type.startsWith("video/")){
-      preview.innerHTML=`<video src="${URL.createObjectURL(file)}" controls style="max-width:100%;border-radius:10px;max-height:200px;"></video><div style="font-size:12px;color:var(--ink-soft);margin-top:6px;">📹 ${file.name} (${size} MB)</div>`;
-    }else if(file.type.startsWith("image/")){
-      preview.innerHTML=`<img src="${URL.createObjectURL(file)}" style="max-width:100%;border-radius:10px;max-height:200px;"><div style="font-size:12px;color:var(--ink-soft);margin-top:6px;">🖼️ ${file.name} (${size} MB)</div>`;
-    }else{
-      preview.innerHTML=`<div style="padding:14px;background:var(--paper-2);border-radius:10px;">📄 ${file.name} (${size} MB)</div>`;
-    }
+    if(file.type.startsWith("video/")){preview.innerHTML=`<video src="${URL.createObjectURL(file)}" controls style="max-width:100%;border-radius:10px;"></video><div style="font-size:12px;margin-top:6px;">📹 ${file.name} (${size} MB)</div>`;}
+    else if(file.type.startsWith("image/")){preview.innerHTML=`<img src="${URL.createObjectURL(file)}" style="max-width:100%;border-radius:10px;"><div style="font-size:12px;margin-top:6px;">🖼️ ${file.name} (${size} MB)</div>`;}
+    else{preview.innerHTML=`<div style="padding:14px;background:var(--paper-2);border-radius:10px;">📄 ${file.name} (${size} MB)</div>`;}
   });
   document.getElementById("course-form").addEventListener("submit",async(e)=>{
     e.preventDefault();
@@ -556,19 +525,19 @@ function openCourseForm(course){
     if(type==="file"){
       const file=document.getElementById("cr-file").files[0];
       if(file){
-        showMsg(msg,"⏳ جاري رفع الملف...","ok");
+        showMsg(msg,"جاري رفع الملف...","ok");
         const path=`courses/${Date.now()}_${file.name}`;
         const {error:upErr}=await supabaseClient.storage.from(STORAGE_BUCKET).upload(path,file,{contentType:file.type,upsert:false});
-        if(upErr){showMsg(msg,"❌ فشل الرفع: "+friendlyError(upErr),"error");return;}
+        if(upErr){showMsg(msg,"فشل الرفع: "+friendlyError(upErr),"error");return;}
         contentUrl=supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
-      }else if(!course){showMsg(msg,"⚠️ اختار ملف الأول","error");return;}
+      }else if(!course){showMsg(msg,"اختار ملف الأول","error");return;}
       else{contentUrl=course.content_url;}
     }
-    const payload={title_ar:document.getElementById("cr-title-ar").value.trim(),title_en:document.getElementById("cr-title-en").value.trim(),grade_level_id:document.getElementById("cr-level").value,description_ar:document.getElementById("cr-desc-ar").value.trim(),description_en:document.getElementById("cr-desc-en").value.trim(),content_type:type,content_url:contentUrl};
+    const payload={title_ar:document.getElementById("cr-title-ar").value.trim(),title_en:document.getElementById("cr-title-en").value.trim(),grade_level_id:document.getElementById("cr-level").value,description_ar:document.getElementById("cr-desc-ar").value.trim(),content_type:type,content_url:contentUrl};
     const q=course?supabaseClient.from("courses").update(payload).eq("id",course.id):supabaseClient.from("courses").insert(payload);
     const {error}=await q;
-    if(error){showMsg(msg,"❌ "+friendlyError(error),"error");return;}
-    logOk("الكورس",course?"تم التعديل":"تمت الإضافة");
+    if(error){showMsg(msg,friendlyError(error),"error");return;}
+    logOk("الكورس","تم الحفظ");
     closeFormModal();await loadCourses();await loadKpis();
   });
 }
@@ -583,7 +552,7 @@ async function loadPackages(){
 
 function openPackageForm(pkg){
   if(!CURRENT_LEVELS.length){showToast("⚠️ لازم تضيفي مرحلة الأول","error");return;}
-  document.getElementById("form-modal-content").innerHTML=`<button class="close" onclick="closeFormModal()">✕</button><h3>${pkg?"✏️ تعديل باقة":"➕ إضافة باقة"}</h3><form id="package-form"><div class="field"><label>اسم الباقة (عربي)</label><input type="text" id="pk-name-ar" value="${pkg?.name_ar||""}" required></div><div class="field"><label>Package name (English)</label><input type="text" id="pk-name-en" value="${pkg?.name_en||""}" required></div><div class="field"><label>المرحلة الدراسية</label><select id="pk-level" required>${levelOptions(pkg?.grade_level_id)}</select></div><div class="field"><label>السعر (ج.م)</label><input type="number" step="0.01" id="pk-price" value="${pkg?.price??0}" required></div><div class="field"><label>مدة الاشتراك (يوم)</label><input type="number" id="pk-duration" value="${pkg?.duration_days??30}" required></div><div class="field"><label>وصف مختصر</label><textarea id="pk-desc" rows="2">${pkg?.description_ar||""}</textarea></div><button class="btn btn-gold btn-block" type="submit">💾 حفظ</button><div class="form-msg" id="package-msg"></div></form>`;
+  document.getElementById("form-modal-content").innerHTML=`<button class="close" onclick="closeFormModal()">✕</button><h3>${pkg?"تعديل باقة":"إضافة باقة"}</h3><form id="package-form"><div class="field"><label>اسم الباقة (عربي)</label><input type="text" id="pk-name-ar" value="${pkg?.name_ar||""}" required></div><div class="field"><label>Package name (English)</label><input type="text" id="pk-name-en" value="${pkg?.name_en||""}" required></div><div class="field"><label>المرحلة الدراسية</label><select id="pk-level" required>${levelOptions(pkg?.grade_level_id)}</select></div><div class="field"><label>السعر (ج.م)</label><input type="number" id="pk-price" value="${pkg?.price??0}" required></div><div class="field"><label>مدة الاشتراك (يوم)</label><input type="number" id="pk-duration" value="${pkg?.duration_days??30}" required></div><div class="field"><label>وصف</label><textarea id="pk-desc" rows="2">${pkg?.description_ar||""}</textarea></div><button class="btn btn-gold btn-block" type="submit">حفظ</button><div class="form-msg" id="package-msg"></div></form>`;
   document.getElementById("form-overlay").classList.add("open");
   document.getElementById("package-form").addEventListener("submit",async(e)=>{
     e.preventDefault();
@@ -592,14 +561,14 @@ function openPackageForm(pkg){
     const q=pkg?supabaseClient.from("packages").update(payload).eq("id",pkg.id):supabaseClient.from("packages").insert(payload);
     const {error}=await q;
     if(error){showMsg(msg,friendlyError(error),"error");return;}
-    logOk("الباقة",pkg?"تم التعديل":"تمت الإضافة");
+    logOk("الباقة","تم الحفظ");
     closeFormModal();await loadPackages();await loadKpis();
   });
 }
 
 function openAddStudentForm(){
   if(!CURRENT_LEVELS.length){showToast("⚠️ لازم تضيفي مرحلة الأول","error");return;}
-  document.getElementById("form-modal-content").innerHTML=`<button class="close" onclick="closeFormModal()">✕</button><h3>إضافة حساب طالب جديد</h3><form id="add-student-form"><div class="field"><label>اسم الطالب</label><input type="text" id="as-name" required></div><div class="field"><label>البريد الإلكتروني</label><input type="email" id="as-email" required></div><div class="field"><label>رقم الهاتف</label><input type="tel" id="as-phone"></div><div class="field"><label>كلمة مرور مبدئية</label><input type="text" id="as-password" required minlength="6"></div><div class="field"><label>المرحلة الدراسية</label><select id="as-level">${levelOptions()}</select></div><button class="btn btn-gold btn-block" type="submit">إنشاء الحساب</button><div class="form-msg" id="add-student-msg"></div></form>`;
+  document.getElementById("form-modal-content").innerHTML=`<button class="close" onclick="closeFormModal()">✕</button><h3>إضافة حساب طالب</h3><form id="add-student-form"><div class="field"><label>الاسم</label><input type="text" id="as-name" required></div><div class="field"><label>الإيميل</label><input type="email" id="as-email" required></div><div class="field"><label>الهاتف</label><input type="tel" id="as-phone"></div><div class="field"><label>كلمة مرور</label><input type="text" id="as-password" required minlength="6"></div><div class="field"><label>المرحلة</label><select id="as-level">${levelOptions()}</select></div><button class="btn btn-gold btn-block" type="submit">إنشاء</button><div class="form-msg" id="add-student-msg"></div></form>`;
   document.getElementById("form-overlay").classList.add("open");
   document.getElementById("add-student-form").addEventListener("submit",async(e)=>{
     e.preventDefault();
@@ -609,15 +578,15 @@ function openAddStudentForm(){
     const phone=document.getElementById("as-phone").value.trim();
     const password=document.getElementById("as-password").value;
     const grade_level_id=document.getElementById("as-level").value;
-    showMsg(msg,"جاري إنشاء الحساب...","ok");
-    const tempClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false,storageKey:"temp-create-"+Date.now()}});
+    showMsg(msg,"جاري الإنشاء...","ok");
+    const tempClient=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{persistSession:false,autoRefreshToken:false,storageKey:"temp-"+Date.now()}});
     const {data,error}=await tempClient.auth.signUp({email,password});
     if(error){showMsg(msg,friendlyError(error),"error");return;}
     const uid=data.user?.id;
-    if(!uid){showMsg(msg,"الحساب محتاج تأكيد إيميل","error");return;}
+    if(!uid){showMsg(msg,"محتاج تأكيد إيميل","error");return;}
     const {error:pe}=await supabaseClient.from("profiles").insert({id:uid,full_name,phone:phone||null,role:"student",grade_level_id});
     if(pe){showMsg(msg,friendlyError(pe),"error");return;}
-    logOk("الطالب","تم إنشاء الحساب بنجاح");
+    logOk("الطالب","تم الإنشاء");
     closeFormModal();await loadStudents();await loadKpis();
   });
 }
@@ -635,23 +604,23 @@ async function loadStudents(){
 }
 
 async function deleteStudent(studentId,studentName){
-  if(!confirm(`متأكدة إنك عايزة تحذفي حساب "${studentName}"؟`))return;
+  if(!confirm(`متأكدة إنك عايزة تحذفي "${studentName}"؟`))return;
   await supabaseClient.from("subscriptions").delete().eq("student_id",studentId);
   const {error}=await supabaseClient.from("profiles").delete().eq("id",studentId);
-  if(error){logError("حذف حساب الطالب",error);return;}
-  logOk("الحذف","تم حذف الحساب بنجاح");
+  if(error){logError("حذف الطالب",error);return;}
+  logOk("الحذف","تم الحذف");
   await loadStudents();await loadKpis();
 }
 window.deleteStudent=deleteStudent;
 
 function openSubscriptionForm(studentId,studentName){
-  document.getElementById("form-modal-content").innerHTML=`<button class="close" onclick="closeFormModal()">✕</button><h3>إدارة اشتراك: ${studentName}</h3><form id="sub-form"><div class="field"><label>المرحلة الدراسية</label><select id="sub-level" required>${levelOptions()}</select></div><div class="field"><label>الباقة</label><select id="sub-package"></select></div><button class="btn btn-gold btn-block" type="submit">تفعيل الاشتراك</button><div class="form-msg" id="sub-msg"></div></form>`;
+  document.getElementById("form-modal-content").innerHTML=`<button class="close" onclick="closeFormModal()">✕</button><h3>اشتراك: ${studentName}</h3><form id="sub-form"><div class="field"><label>المرحلة</label><select id="sub-level" required>${levelOptions()}</select></div><div class="field"><label>الباقة</label><select id="sub-package"></select></div><button class="btn btn-gold btn-block" type="submit">تفعيل</button><div class="form-msg" id="sub-msg"></div></form>`;
   document.getElementById("form-overlay").classList.add("open");
   const levelSelect=document.getElementById("sub-level");
   const packageSelect=document.getElementById("sub-package");
   const loadPkgOptions=async()=>{
     const {data,error}=await supabaseClient.from("packages").select("*").eq("grade_level_id",levelSelect.value);
-    if(error)logError("تحميل باقات المرحلة",error);
+    if(error)logError("تحميل باقات",error);
     packageSelect.innerHTML=(data||[]).map(p=>`<option value="${p.id}" data-days="${p.duration_days}">${p.name_ar} — ${p.price} ج.م</option>`).join("");
   };
   levelSelect.addEventListener("change",loadPkgOptions);
@@ -660,13 +629,13 @@ function openSubscriptionForm(studentId,studentName){
     e.preventDefault();
     const msg=document.getElementById("sub-msg");
     const packageId=packageSelect.value;
-    if(!packageId){showMsg(msg,"أضيفي باقة لهذه المرحلة أولًا","error");return;}
+    if(!packageId){showMsg(msg,"مفيش باقة","error");return;}
     const days=Number(packageSelect.selectedOptions[0].dataset.days||30);
     const endDate=new Date();endDate.setDate(endDate.getDate()+days);
     await supabaseClient.from("profiles").update({grade_level_id:levelSelect.value}).eq("id",studentId);
     const {error}=await supabaseClient.from("subscriptions").insert({student_id:studentId,package_id:packageId,end_date:endDate.toISOString().slice(0,10),status:"active"});
     if(error){showMsg(msg,friendlyError(error),"error");return;}
-    logOk("الاشتراك","تم تفعيل الاشتراك بنجاح");
+    logOk("الاشتراك","تم التفعيل");
     closeFormModal();await loadStudents();await loadKpis();
   });
 }
@@ -686,25 +655,25 @@ async function saveSettings(e){
   const dial=document.getElementById("set-country").value;
   const local=document.getElementById("set-whatsapp").value.trim();
   const full=composeFullPhone(dial,local);
-  if(!full){showToast("⚠️ من فضلك اكتبي رقم واتساب صحيح","error");return;}
+  if(!full){showToast("⚠️ رقم غلط","error");return;}
   const {error}=await supabaseClient.from("settings").update({owner_name:document.getElementById("set-owner-name").value.trim()||"ms. sherehan ali",whatsapp_number:full}).eq("id",1);
   if(error){logError("حفظ الإعدادات",error);return;}
-  logOk("الإعدادات","تم حفظ الرقم: "+full);
+  logOk("الإعدادات","تم الحفظ: "+full);
   await wireWhatsAppButton();
 }
 function closeFormModal(){document.getElementById("form-overlay").classList.remove("open");}
 async function deleteRow(table,id,refreshFn){
-  if(!confirm("متأكدة إنك عايزة تحذفي ده؟"))return;
+  if(!confirm("متأكدة؟"))return;
   const {error}=await supabaseClient.from(table).delete().eq("id",id);
-  if(error){logError("حذف سجل من "+table,error);return;}
-  logOk("الحذف","تم الحذف بنجاح");
+  if(error){logError("حذف",error);return;}
+  logOk("الحذف","تم");
   await refreshFn();await loadKpis();
 }
 
 function getYouTubeId(url){
   if(!url)return null;
-  const patterns=[/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,/^([A-Za-z0-9_-]{11})$/];
-  for(const p of patterns){const m=url.match(p);if(m)return m[1];}
+  const p=[/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,/^([A-Za-z0-9_-]{11})$/];
+  for(const x of p){const m=url.match(x);if(m)return m[1];}
   return null;
 }
 function getVideoInfo(course){
@@ -713,36 +682,29 @@ function getVideoInfo(course){
   const ytId=getYouTubeId(url);
   if(ytId)return{kind:"youtube",thumbnail:`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`,watchUrl:`https://www.youtube.com/watch?v=${ytId}`};
   if(/\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url))return{kind:"video-file",thumbnail:null,watchUrl:url};
-  const gd=url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([A-Za-z0-9_-]+)/);
-  if(gd)return{kind:"drive",thumbnail:`https://drive.google.com/thumbnail?id=${gd[1]}&sz=w800`,watchUrl:`https://drive.google.com/file/d/${gd[1]}/view`};
   return null;
 }
 function buildCourseCard(course,lang){
   const title=lang==="ar"?course.title_ar:(course.title_en||course.title_ar);
-  const desc=lang==="ar"?(course.description_ar||""):(course.description_en||"");
+  const desc=lang==="ar"?(course.description_ar||""):"";
   const isFile=course.content_type==="file";
   const video=getVideoInfo(course);
   let thumbHTML="",actionLabel="",targetUrl=course.content_url;
   if(video?.kind==="youtube"){
     targetUrl=video.watchUrl;
-    const ytId=getYouTubeId(course.content_url);
-    thumbHTML=`<a class="course-thumb" href="${targetUrl}" target="_blank" rel="noopener"><img src="${video.thumbnail}" alt="${title}" loading="lazy" onerror="this.onerror=null;this.src='https://img.youtube.com/vi/${ytId}/mqdefault.jpg';"><div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div><span class="video-badge">▶ فيديو</span></a>`;
-    actionLabel="▶️ مشاهدة الفيديو";
-  }else if(video?.kind==="drive"){
-    targetUrl=video.watchUrl;
-    thumbHTML=`<a class="course-thumb" href="${targetUrl}" target="_blank" rel="noopener"><img src="${video.thumbnail}" alt="${title}" loading="lazy"><div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div><span class="video-badge">▶ فيديو</span></a>`;
-    actionLabel="▶️ مشاهدة الفيديو";
+    thumbHTML=`<a class="course-thumb" href="${targetUrl}" target="_blank"><img src="${video.thumbnail}" loading="lazy"><div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div><span class="video-badge">▶ فيديو</span></a>`;
+    actionLabel="▶️ مشاهدة";
   }else if(video?.kind==="video-file"){
-    thumbHTML=`<a class="course-thumb" href="${targetUrl}" target="_blank" rel="noopener"><video src="${targetUrl}#t=0.5" preload="metadata" muted playsinline></video><div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div><span class="video-badge">▶ فيديو</span></a>`;
-    actionLabel="▶️ مشاهدة الفيديو";
+    thumbHTML=`<a class="course-thumb" href="${targetUrl}" target="_blank"><video src="${targetUrl}#t=0.5" preload="metadata" muted playsinline></video><div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div><span class="video-badge">▶ فيديو</span></a>`;
+    actionLabel="▶️ مشاهدة";
   }else if(isFile){
-    thumbHTML=`<div class="course-thumb file-thumb"><div class="file-icon">📄</div><span class="video-badge" style="background:var(--teal);">ملف</span></div>`;
-    actionLabel="⬇️ تحميل الملف";
+    thumbHTML=`<div class="course-thumb file-thumb"><div class="file-icon">📄</div></div>`;
+    actionLabel="⬇️ تحميل";
   }else{
-    thumbHTML=`<div class="course-thumb file-thumb"><div class="file-icon">🔗</div><span class="video-badge" style="background:var(--gold);">رابط</span></div>`;
-    actionLabel="🔗 فتح الرابط";
+    thumbHTML=`<div class="course-thumb file-thumb"><div class="file-icon">🔗</div></div>`;
+    actionLabel="🔗 فتح";
   }
-  return `<div class="card course-card">${thumbHTML}<div class="course-body"><h3>${title}</h3><p>${desc}</p><a class="btn btn-teal btn-block" href="${targetUrl}" target="_blank" rel="noopener" ${isFile&&!video?"download":""}>${actionLabel}</a></div></div>`;
+  return `<div class="card course-card">${thumbHTML}<div class="course-body"><h3>${title}</h3><p>${desc}</p><a class="btn btn-teal btn-block" href="${targetUrl}" target="_blank" ${isFile&&!video?"download":""}>${actionLabel}</a></div></div>`;
 }
 
 async function loadStudentDashboard(profile){
@@ -755,7 +717,7 @@ async function loadStudentDashboard(profile){
   const isActive=!!(latestSub&&latestSub.status==="active"&&endOfDay>=new Date());
   const badge=document.getElementById("sub-badge");
   badge.className="badge "+(isActive?"active":"expired");
-  badge.textContent=isActive?("اشتراك فعّال حتى "+latestSub.end_date):"لا يوجد اشتراك فعّال";
+  badge.textContent=isActive?("فعّال حتى "+latestSub.end_date):"لا يوجد اشتراك";
   const notice=document.getElementById("no-sub-notice");
   const grid=document.getElementById("courses-grid");
   if(!isActive){
@@ -768,7 +730,7 @@ async function loadStudentDashboard(profile){
   if(!profile.grade_level_id){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1;">محتاجة تحددي المرحلة</div>`;return;}
   const {data:courses,error}=await supabaseClient.from("courses").select("*").eq("grade_level_id",profile.grade_level_id).order("sort_order");
   if(error){logError("تحميل كورسات الطالب",error);grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1;">⚠️ ${friendlyError(error)}</div>`;return;}
-  if(!courses||!courses.length){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1;">لسه مفيش كورسات لمرحلتك</div>`;return;}
+  if(!courses||!courses.length){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1;">لسه مفيش كورسات</div>`;return;}
   grid.innerHTML=courses.map(c=>buildCourseCard(c,lang)).join("");
 }
 
@@ -778,29 +740,22 @@ async function initApp(){
   if(!session){showView("public");await loadHome();await wireWhatsAppButton();return;}
   const profRes=await supabaseClient.from("profiles").select("*").eq("id",session.user.id).maybeSingle();
   if(profRes.error){logError("تحميل البروفايل",profRes.error);showView("public");await loadHome();await wireWhatsAppButton();return;}
-  if(!profRes.data){showToast("⚠️ حسابك موجود لكن مفيش بروفايل","error",8000);showView("public");await loadHome();await wireWhatsAppButton();return;}
+  if(!profRes.data){showToast("⚠️ مفيش بروفايل","error",8000);showView("public");await loadHome();await wireWhatsAppButton();return;}
   CURRENT_PROFILE=profRes.data;
-
   const isYassen = CURRENT_PROFILE.full_name.includes("Yassen") || CURRENT_PROFILE.full_name.includes("ياسين");
-
   if(isYassen && !VIEW_MODE){
     showView("owner");
     setTimeout(() => showRolePicker(), 400);
     return;
   }
-
   applyRoleMode();
   const effectiveRole = CURRENT_PROFILE.effectiveRole || CURRENT_PROFILE.role;
-
   if(ADMIN_ROLES.includes(effectiveRole)){
     showView("owner");
     wireOwnerTabs();
     hideSupportFabsForRole(effectiveRole);
-    if(effectiveRole === "superadmin"){
-      document.body.classList.add("is-superadmin");
-    } else {
-      document.body.classList.remove("is-superadmin");
-    }
+    if(effectiveRole === "superadmin"){document.body.classList.add("is-superadmin");}
+    else {document.body.classList.remove("is-superadmin");}
     await refreshOwnerData();
   } else {
     showView("student");
@@ -824,9 +779,4 @@ document.addEventListener("DOMContentLoaded",async()=>{
   });
   document.getElementById("support-close")?.addEventListener("click",closeSupportPanel);
   await initApp();
-});
-
-window.addEventListener("unhandledrejection",(e)=>{
-  console.error("Unhandled promise:",e.reason);
-  showToast("⚠️ خطأ غير متوقع: "+friendlyError(e.reason),"error");
 });

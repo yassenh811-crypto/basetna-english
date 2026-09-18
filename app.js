@@ -1,5 +1,5 @@
 /* ============================================================
-   بسّطنا الإنجليزي — app.js v18 (كامل مصحّح)
+   بسّطنا الإنجليزي — app.js v21 (كامل)
    ============================================================ */
 (function(){
   function makeMem(){
@@ -15,8 +15,6 @@
   if(!test(window.sessionStorage)){try{Object.defineProperty(window,"sessionStorage",{configurable:true,value:makeMem()});}catch(e){window.sessionStorage=makeMem();}}
 })();
 
-console.log("🚀 app.js بدأ التحميل");
-
 const SUPABASE_URL = "https://wgostqkywpybmzgbyzeo.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_zx0zeWR2bpbmyO90oN-4ow_FxZCSPl8";
 const OWNER_USERNAME_MAP = {"yassen":"yassenq14232@gmail.com","shere":"shere@basetna-english.com"};
@@ -24,12 +22,12 @@ const SERIAL_MAP = {"yassen":"serial-2.2.2-yassen","shere":"serial_1.1.1_shere"}
 const STORAGE_BUCKET = "course-files";
 const ADMIN_ROLES = ["superadmin","owner","support"];
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-console.log("✅ Supabase ready");
 
 let CURRENT_LEVELS = [];
 let CURRENT_PROFILE = null;
 let ALL_CONTACTS = [];
 let VIEW_MODE = localStorage.getItem("basetna_view_mode") || null;
+let ALL_COURSES_CACHE = [];
 
 function ensureToastEl(){let el=document.getElementById("global-toast");if(!el){el=document.createElement("div");el.id="global-toast";el.className="global-toast";document.body.appendChild(el);}return el;}
 function showToast(msg,type="error",duration=6000){const el=ensureToastEl();el.className="global-toast show "+type;el.textContent=msg;clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>el.classList.remove("show"),duration);}
@@ -100,19 +98,45 @@ function showView(view){
 }
 function hideSupportFabsForRole(){document.querySelectorAll(".support-fab").forEach(b=>{b.style.display="flex";});}
 function showMsg(el,text,type){el.textContent=text;el.className="form-msg "+type;}
+function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
+/* ===== Video Helpers ===== */
+function extractYouTubeId(url){
+  if(!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,
+    /^([A-Za-z0-9_-]{11})$/
+  ];
+  for(const p of patterns){const m=url.match(p);if(m)return m[1];}
+  return null;
+}
+function getVideoThumbnail(type, url){
+  if(type === "youtube"){const id = extractYouTubeId(url);return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;}
+  if(type === "drive"){const m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([A-Za-z0-9_-]+)/);return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w800` : null;}
+  return null;
+}
+function getYouTubeId(url){return extractYouTubeId(url);}
+function getVideoInfo(course){
+  const url=(course?.content_url||"").trim();
+  if(!url)return null;
+  const ytId=extractYouTubeId(url);
+  if(ytId)return{kind:"youtube",thumbnail:`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`,watchUrl:`https://www.youtube.com/watch?v=${ytId}`};
+  if(/\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url))return{kind:"video-file",thumbnail:null,watchUrl:url};
+  const gd=url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([A-Za-z0-9_-]+)/);
+  if(gd)return{kind:"drive",thumbnail:`https://drive.google.com/thumbnail?id=${gd[1]}&sz=w800`,watchUrl:`https://drive.google.com/file/d/${gd[1]}/view`};
+  return null;
+}
+
+/* ===== Role Picker ===== */
 function showRolePicker(){
-  console.log("🎭 showRolePicker called");
-  if(!CURRENT_PROFILE){console.warn("⚠️ No profile");return;}
+  if(!CURRENT_PROFILE) return;
   const modal = document.getElementById("role-picker-overlay");
-  if(!modal){console.error("❌ Modal not found in HTML!");return;}
+  if(!modal) return;
   modal.classList.add("open");
-  console.log("✅ Role picker opened");
 }
 window.showRolePicker = showRolePicker;
 
 function pickRole(role){
-  console.log("🎯 pickRole:", role);
   document.getElementById("role-picker-overlay").classList.remove("open");
   if(role === "logout"){localStorage.removeItem("basetna_view_mode");logout();return;}
   VIEW_MODE = role;
@@ -128,7 +152,6 @@ function applyRoleMode(){
   else{CURRENT_PROFILE.effectiveRole = CURRENT_PROFILE.role;}
   updateRoleUI();
 }
-
 function updateRoleUI(){
   const role = CURRENT_PROFILE?.effectiveRole || CURRENT_PROFILE?.role;
   const badge = document.getElementById("current-role-badge");
@@ -145,6 +168,7 @@ function updateRoleUI(){
   }
 }
 
+/* ===== Auth ===== */
 async function handleLogin(e){
   e.preventDefault();
   const msg=document.getElementById("login-msg");
@@ -179,6 +203,7 @@ async function logout(e){
 }
 window.logout=logout;
 
+/* ===== WhatsApp ===== */
 async function getWhatsAppNumber(){
   const {data,error}=await supabaseClient.from("settings").select("whatsapp_number").eq("id",1).maybeSingle();
   if(error)return null;
@@ -197,6 +222,7 @@ async function subscribeViaWhatsApp(packageName){
   window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`,"_blank");
 }
 
+/* ===== Home ===== */
 async function loadHome(){
   const lang=localStorage.getItem("basetna_lang")||"ar";
   const levelsRes=await supabaseClient.from("grade_levels").select("*").order("sort_order");
@@ -216,8 +242,7 @@ async function loadHome(){
     :`<div class="empty-state">لسه مفيش باقات</div>`;
 }
 
-function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-
+/* ===== Support ===== */
 async function openSupportPanel(recipientRole="support"){
   if(!CURRENT_PROFILE){showToast("⚠️ سجّل دخول الأول","error");return;}
   const overlay=document.getElementById("support-overlay");
@@ -356,6 +381,7 @@ async function loadChatsPanel(){
   list.innerHTML=html;
 }
 
+/* ===== Owner Tabs ===== */
 function wireOwnerTabs(){
   document.querySelectorAll(".nav-link[data-tab]").forEach(link=>{
     link.addEventListener("click",(e)=>{
@@ -371,6 +397,7 @@ function wireOwnerTabs(){
       if(link.dataset.tab==="courses")loadCourses();
       if(link.dataset.tab==="packages")loadPackages();
       if(link.dataset.tab==="students")loadStudents();
+      if(link.dataset.tab==="stats")loadStats();
     });
   });
 }
@@ -415,6 +442,91 @@ async function loadKpis(){
   document.getElementById("kpi-levels").textContent=CURRENT_LEVELS.length;
 }
 
+/* ===== Stats / التقارير ===== */
+async function loadStats(){
+  const el = document.getElementById("stats-content");
+  if(!el) return;
+  el.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
+
+  const [levelsStats, lessonsStats, ratingsRes] = await Promise.all([
+    supabaseClient.rpc("stats_students_per_level"),
+    supabaseClient.rpc("stats_lessons_per_course"),
+    supabaseClient.from("course_ratings").select("rating")
+  ]);
+
+  if(levelsStats.error) logError("إحصائيات المراحل", levelsStats.error);
+  if(lessonsStats.error) logError("إحصائيات الدروس", lessonsStats.error);
+
+  const levels = levelsStats.data || [];
+  const coursesStats = lessonsStats.data || [];
+  const ratings = ratingsRes.data || [];
+
+  const totalStudents = levels.reduce((a, l) => a + Number(l.students_count || 0), 0);
+  const totalActive = levels.reduce((a, l) => a + Number(l.active_subs || 0), 0);
+  const totalRatings = ratings.length;
+  const avgAll = totalRatings ? (ratings.reduce((a,r) => a + r.rating, 0) / totalRatings).toFixed(1) : "—";
+
+  el.innerHTML = `
+    <div class="kpi-row" style="margin-bottom:24px;">
+      <div class="kpi"><div class="num">${totalStudents}</div><div class="label">👥 إجمالي الطلاب</div></div>
+      <div class="kpi"><div class="num">${totalActive}</div><div class="label">✅ اشتراكات فعّالة</div></div>
+      <div class="kpi"><div class="num">${coursesStats.length}</div><div class="label">📚 الكورسات</div></div>
+      <div class="kpi"><div class="num">${avgAll}</div><div class="label">⭐ متوسط التقييم</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <h3 style="color:var(--navy-deep);margin:0 0 14px;">📊 الطلاب لكل مرحلة</h3>
+      ${levels.length ? `
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:var(--paper-2);">
+            <th style="padding:10px;text-align:start;">المرحلة</th>
+            <th style="padding:10px;text-align:start;">عدد الطلاب</th>
+            <th style="padding:10px;text-align:start;">اشتراكات فعّالة</th>
+            <th style="padding:10px;text-align:start;">النسبة</th>
+          </tr></thead>
+          <tbody>
+            ${levels.map(l => {
+              const pct = l.students_count > 0 ? Math.round((Number(l.active_subs) / Number(l.students_count)) * 100) : 0;
+              return `<tr>
+                <td style="padding:10px;border-bottom:1px solid var(--line);">${escapeHtml(l.level_name)}</td>
+                <td style="padding:10px;border-bottom:1px solid var(--line);"><b>${l.students_count}</b></td>
+                <td style="padding:10px;border-bottom:1px solid var(--line);">${l.active_subs}</td>
+                <td style="padding:10px;border-bottom:1px solid var(--line);">
+                  <div style="background:var(--paper-2);border-radius:999px;overflow:hidden;height:8px;width:100px;">
+                    <div style="background:linear-gradient(90deg,var(--teal),var(--gold));height:100%;width:${pct}%;"></div>
+                  </div>
+                  <span style="font-size:12px;color:var(--ink-soft);">${pct}%</span>
+                </td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      ` : `<div class="empty-state">مفيش بيانات</div>`}
+    </div>
+
+    <div class="card">
+      <h3 style="color:var(--navy-deep);margin:0 0 14px;">🎬 الكورسات والفيديوهات</h3>
+      ${coursesStats.length ? `
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:var(--paper-2);">
+            <th style="padding:10px;text-align:start;">الكورس</th>
+            <th style="padding:10px;text-align:start;">عدد الفيديوهات</th>
+            <th style="padding:10px;text-align:start;">⭐ التقييم</th>
+          </tr></thead>
+          <tbody>
+            ${coursesStats.map(c => `<tr>
+              <td style="padding:10px;border-bottom:1px solid var(--line);">${escapeHtml(c.course_title)}</td>
+              <td style="padding:10px;border-bottom:1px solid var(--line);"><b>${c.lessons_count}</b></td>
+              <td style="padding:10px;border-bottom:1px solid var(--line);">${c.avg_rating} ⭐</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      ` : `<div class="empty-state">مفيش كورسات لسه</div>`}
+    </div>`;
+}
+window.loadStats = loadStats;
+
+/* ===== Levels ===== */
 async function loadLevels(){
   const {data,error}=await supabaseClient.from("grade_levels").select("*").order("sort_order");
   if(error){logError("تحميل المراحل",error);return;}
@@ -439,12 +551,42 @@ function openLevelForm(level){
   });
 }
 
+/* ===== Courses ===== */
 async function loadCourses(){
   const {data,error}=await supabaseClient.from("courses").select("*, grade_levels(name_ar)").order("sort_order");
   if(error){logError("تحميل الكورسات",error);return;}
+  ALL_COURSES_CACHE = data || [];
+
+  // جلب عدد الفيديوهات والتقييم لكل كورس
+  const courseIds = (data || []).map(c => c.id);
+  let lessonsCount = {};
+  let ratingsAvg = {};
+  if(courseIds.length){
+    const { data: lessonsData } = await supabaseClient.from("lessons").select("course_id").in("course_id", courseIds);
+    (lessonsData||[]).forEach(l => { lessonsCount[l.course_id] = (lessonsCount[l.course_id]||0)+1; });
+    const { data: ratingsData } = await supabaseClient.from("course_ratings").select("course_id, rating").in("course_id", courseIds);
+    const totals = {};
+    (ratingsData||[]).forEach(r => {
+      if(!totals[r.course_id]) totals[r.course_id] = {sum:0, count:0};
+      totals[r.course_id].sum += r.rating;
+      totals[r.course_id].count += 1;
+    });
+    Object.keys(totals).forEach(k => { ratingsAvg[k] = (totals[k].sum / totals[k].count).toFixed(1); });
+  }
+
   document.getElementById("courses-table").innerHTML=(data&&data.length)
-    ?data.map(c=>`<tr><td><b>${escapeHtml(c.title_ar)}</b></td><td>${c.grade_levels?.name_ar||"—"}</td><td>${c.content_type==="link"?"🔗":"📄"}</td><td><button class="icon-btn" onclick='openCourseForm(${JSON.stringify(c).replace(/'/g,"&#39;")})'>✏️</button><button class="icon-btn danger" onclick="deleteRow('courses','${c.id}', loadCourses)">🗑️</button></td></tr>`).join("")
-    :`<tr><td colspan="4"><div class="empty-state">لسه مفيش كورسات</div></td></tr>`;
+    ?data.map(c=>`<tr>
+        <td><b>${escapeHtml(c.title_ar)}</b></td>
+        <td>${c.grade_levels?.name_ar||"—"}</td>
+        <td><b>${lessonsCount[c.id]||0}</b> فيديو</td>
+        <td>${ratingsAvg[c.id]||"—"} ⭐</td>
+        <td>
+          <button class="icon-btn" onclick='openLessonsManager("${c.id}","${escapeHtml(c.title_ar).replace(/'/g,"&#39;")}")'>🎬 الفيديوهات</button>
+          <button class="icon-btn" onclick='openCourseForm(${JSON.stringify(c).replace(/'/g,"&#39;")})'>✏️</button>
+          <button class="icon-btn danger" onclick="deleteRow('courses','${c.id}', loadCourses)">🗑️</button>
+        </td>
+      </tr>`).join("")
+    :`<tr><td colspan="5"><div class="empty-state">لسه مفيش كورسات</div></td></tr>`;
 }
 
 function levelOptions(selectedId){
@@ -464,54 +606,23 @@ function openCourseForm(course){
       <div class="field"><label>وصف</label><textarea id="cr-desc-ar" rows="2">${course?.description_ar||""}</textarea></div>
       <div class="field"><label>نوع المحتوى</label>
         <select id="cr-type">
-          <option value="file" ${course?.content_type==="file"?"selected":""}>📱 رفع من الموبايل</option>
-          <option value="link" ${course?.content_type==="link"?"selected":""}>🔗 رابط خارجي</option>
+          <option value="link" ${course?.content_type==="link"?"selected":""}>🎬 كورس فيديوهات</option>
+          <option value="file" ${course?.content_type==="file"?"selected":""}>📄 ملف</option>
         </select></div>
-      <div class="field" id="cr-file-field">
-        <label>اختار الملف</label>
-        <input type="file" id="cr-file" accept="video/*,image/*,.pdf,.doc,.docx">
-        <div id="file-preview" style="margin-top:10px;"></div>
-      </div>
-      <div class="field" id="cr-link-field" hidden>
-        <label>الرابط</label>
-        <input type="url" id="cr-link" value="${course?.content_type==="link"?course.content_url:""}">
+      <div class="field" id="cr-link-field">
+        <label>رابط الفيديو التقديمي (اختياري)</label>
+        <input type="url" id="cr-link" value="${course?.content_type==="link"?course.content_url:""}" placeholder="https://youtu.be/...">
       </div>
       <button class="btn btn-gold btn-block" type="submit">حفظ</button>
       <div class="form-msg" id="course-msg"></div>
     </form>`;
   document.getElementById("form-overlay").classList.add("open");
-  const typeSelect=document.getElementById("cr-type");
-  const toggleType=()=>{
-    const isFile=typeSelect.value==="file";
-    document.getElementById("cr-file-field").hidden=!isFile;
-    document.getElementById("cr-link-field").hidden=isFile;
-  };
-  typeSelect.addEventListener("change",toggleType);toggleType();
-  document.getElementById("cr-file").addEventListener("change",(e)=>{
-    const file=e.target.files[0];
-    const preview=document.getElementById("file-preview");
-    if(!file){preview.innerHTML="";return;}
-    const size=(file.size/1024/1024).toFixed(1);
-    if(file.type.startsWith("video/")){preview.innerHTML=`<video src="${URL.createObjectURL(file)}" controls style="max-width:100%;border-radius:10px;"></video><div style="font-size:12px;margin-top:6px;">📹 ${file.name} (${size} MB)</div>`;}
-    else if(file.type.startsWith("image/")){preview.innerHTML=`<img src="${URL.createObjectURL(file)}" style="max-width:100%;border-radius:10px;"><div style="font-size:12px;margin-top:6px;">🖼️ ${file.name}</div>`;}
-    else{preview.innerHTML=`<div style="padding:14px;background:var(--paper-2);border-radius:10px;">📄 ${file.name}</div>`;}
-  });
   document.getElementById("course-form").addEventListener("submit",async(e)=>{
     e.preventDefault();
     const msg=document.getElementById("course-msg");
-    const type=typeSelect.value;
+    const type=document.getElementById("cr-type").value;
     let contentUrl=document.getElementById("cr-link").value.trim();
-    if(type==="file"){
-      const file=document.getElementById("cr-file").files[0];
-      if(file){
-        showMsg(msg,"جاري الرفع...","ok");
-        const path=`courses/${Date.now()}_${file.name}`;
-        const {error:upErr}=await supabaseClient.storage.from(STORAGE_BUCKET).upload(path,file,{contentType:file.type,upsert:false});
-        if(upErr){showMsg(msg,"فشل: "+friendlyError(upErr),"error");return;}
-        contentUrl=supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
-      }else if(!course){showMsg(msg,"اختار ملف","error");return;}
-      else{contentUrl=course.content_url;}
-    }
+    if(!contentUrl){ contentUrl = "https://placeholder.com"; }
     const payload={title_ar:document.getElementById("cr-title-ar").value.trim(),title_en:document.getElementById("cr-title-en").value.trim(),grade_level_id:document.getElementById("cr-level").value,description_ar:document.getElementById("cr-desc-ar").value.trim(),content_type:type,content_url:contentUrl};
     const q=course?supabaseClient.from("courses").update(payload).eq("id",course.id):supabaseClient.from("courses").insert(payload);
     const {error}=await q;
@@ -520,6 +631,230 @@ function openCourseForm(course){
   });
 }
 
+/* ===== Lessons Manager ===== */
+async function openLessonsManager(courseId, courseTitle){
+  const { data: lessons } = await supabaseClient.from("lessons").select("*").eq("course_id", courseId).order("sort_order");
+  const list = lessons || [];
+  document.getElementById("form-modal-content").innerHTML = `
+    <button class="close" onclick="closeFormModal()">✕</button>
+    <h3>🎬 فيديوهات: ${escapeHtml(courseTitle)}</h3>
+    <button class="btn btn-gold btn-block" style="margin-bottom:16px; padding:14px; font-size:15px;"
+            onclick='openLessonForm("${courseId}")'>
+      ➕ إضافة فيديو جديد للسلسلة
+    </button>
+    <div style="max-height:60vh;overflow-y:auto;">
+      ${list.length ? list.map(l => `
+        <div style="background:var(--paper-2);padding:12px;border-radius:8px;margin-bottom:8px;display:flex;gap:10px;align-items:center;">
+          ${getVideoThumbnail(l.video_type, l.video_url) ? `<img src="${getVideoThumbnail(l.video_type, l.video_url)}" style="width:70px;height:44px;object-fit:cover;border-radius:6px;">` : `<div style="width:70px;height:44px;background:var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;">🎬</div>`}
+          <div style="flex:1;min-width:0;">
+            <b style="color:var(--navy-deep);font-size:14px;">${escapeHtml(l.title_ar)}</b>
+            ${l.description_ar ? `<div style="font-size:12px;color:var(--ink-soft);">${escapeHtml(l.description_ar)}</div>` : ""}
+          </div>
+          <button class="icon-btn danger" onclick='deleteLesson("${l.id}","${courseId}","${escapeHtml(courseTitle).replace(/'/g,"&#39;")}")'>🗑️</button>
+        </div>
+      `).join("") : `<div class="empty-state">لسه مفيش فيديوهات</div>`}
+    </div>`;
+  document.getElementById("form-overlay").classList.add("open");
+}
+window.openLessonsManager = openLessonsManager;
+
+function openLessonForm(courseId){
+  document.getElementById("form-modal-content").innerHTML = `
+    <button class="close" onclick="closeFormModal()">✕</button>
+    <h3>🎬 إضافة فيديو جديد</h3>
+    <form id="lesson-form">
+      <div class="field"><label>عنوان الفيديو (عربي)</label><input type="text" id="ls-title" required placeholder="مثال: الشرح - الدرس الأول"></div>
+      <div class="field"><label>وصف مختصر</label><textarea id="ls-desc" rows="2" placeholder="وصف مختصر للفيديو..."></textarea></div>
+      <div class="field"><label>نوع الفيديو</label>
+        <select id="ls-type">
+          <option value="youtube">▶️ يوتيوب</option>
+          <option value="vimeo">🎥 فيميو</option>
+          <option value="drive">📁 جوجل درايف</option>
+          <option value="file">📱 رفع ملف من الموبايل</option>
+        </select></div>
+      <div class="field" id="ls-url-field">
+        <label id="ls-url-label">رابط الفيديو على يوتيوب</label>
+        <input type="url" id="ls-url" placeholder="https://youtu.be/xxxxxxxxxxx">
+        <small style="display:block;margin-top:6px;color:var(--ink-soft);font-size:12px;" id="ls-url-hint">
+          الصق رابط الفيديو — الموقع هيشغّله داخل صفحة الكورس تلقائيًا
+        </small>
+      </div>
+      <div class="field" id="ls-file-field" hidden>
+        <label>🎬 اختار ملف الفيديو من جهازك</label>
+        <input type="file" id="ls-file" accept="video/*">
+        <div id="ls-file-preview" style="margin-top:10px;"></div>
+      </div>
+      <div class="field"><label>المدة (بالدقايق) — اختياري</label><input type="number" id="ls-duration" value="0" min="0"></div>
+      <div class="field"><label>الترتيب في السلسلة</label><input type="number" id="ls-order" value="0"></div>
+      <button class="btn btn-gold btn-block" type="submit">💾 حفظ الفيديو</button>
+      <div class="form-msg" id="ls-msg"></div>
+    </form>`;
+
+  const typeSel = document.getElementById("ls-type");
+  const urlField = document.getElementById("ls-url-field");
+  const fileField = document.getElementById("ls-file-field");
+  const urlLabel = document.getElementById("ls-url-label");
+  const urlHint  = document.getElementById("ls-url-hint");
+  const urlInput = document.getElementById("ls-url");
+
+  const toggleType = () => {
+    const t = typeSel.value;
+    fileField.hidden = (t !== "file");
+    urlField.hidden  = (t === "file");
+    if(t === "youtube"){ urlLabel.textContent = "رابط الفيديو على يوتيوب"; urlHint.textContent = "الصق رابط يوتيوب — الموقع هيشغّله داخل صفحة الكورس"; urlInput.placeholder = "https://youtu.be/xxxxxxxxxxx"; }
+    else if(t === "vimeo"){ urlLabel.textContent = "رابط الفيديو على فيميو"; urlHint.textContent = "الصق رابط فيميو — الموقع هيشغّله داخل صفحة الكورس"; urlInput.placeholder = "https://vimeo.com/123456789"; }
+    else if(t === "drive"){ urlLabel.textContent = "رابط الملف على جوجل درايف"; urlHint.textContent = "الصق رابط المشاركة من جوجل درايف"; urlInput.placeholder = "https://drive.google.com/file/d/xxxxx/view"; }
+  };
+  typeSel.addEventListener("change", toggleType); toggleType();
+
+  document.getElementById("ls-file").addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    const preview = document.getElementById("ls-file-preview");
+    if(!file){ preview.innerHTML = ""; return; }
+    const size = (file.size / 1024 / 1024).toFixed(1);
+    preview.innerHTML = `<video src="${URL.createObjectURL(file)}" controls style="max-width:100%;border-radius:10px;max-height:180px;"></video><div style="font-size:12px;color:var(--ink-soft);margin-top:6px;">📹 ${file.name} (${size} MB)</div>`;
+  });
+
+  document.getElementById("lesson-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("ls-msg");
+    const type = typeSel.value;
+    let videoUrl = urlInput.value.trim();
+
+    if(type === "file"){
+      const file = document.getElementById("ls-file").files[0];
+      if(!file){ showMsg(msg, "⚠️ اختار ملف فيديو", "error"); return; }
+      showMsg(msg, "⏳ جاري رفع الفيديو...", "ok");
+      const path = `lessons/${Date.now()}_${file.name}`;
+      const { error: upErr } = await supabaseClient.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+      if(upErr){ showMsg(msg, "❌ فشل الرفع: " + friendlyError(upErr), "error"); return; }
+      videoUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+    } else {
+      if(!videoUrl){ showMsg(msg, "⚠️ الصق رابط الفيديو", "error"); return; }
+    }
+
+    const payload = {
+      course_id: courseId,
+      title_ar: document.getElementById("ls-title").value.trim(),
+      description_ar: document.getElementById("ls-desc").value.trim(),
+      video_type: type,
+      video_url: videoUrl,
+      duration_min: Number(document.getElementById("ls-duration").value) || 0,
+      sort_order: Number(document.getElementById("ls-order").value) || 0
+    };
+    const { error } = await supabaseClient.from("lessons").insert(payload);
+    if(error){ showMsg(msg, friendlyError(error), "error"); return; }
+    logOk("الفيديو", "تمت الإضافة");
+    closeFormModal();
+    await loadCourses();
+  });
+}
+window.openLessonForm = openLessonForm;
+
+async function deleteLesson(id, courseId, courseTitle){
+  if(!confirm("متأكدة؟")) return;
+  const { error } = await supabaseClient.from("lessons").delete().eq("id", id);
+  if(error){ logError("حذف الفيديو", error); return; }
+  logOk("الفيديو", "تم الحذف");
+  openLessonsManager(courseId, courseTitle);
+}
+window.deleteLesson = deleteLesson;
+
+/* ===== Course Player ===== */
+async function openCoursePlayer(courseId, courseTitle){
+  const [courseRes, lessonsRes, ratingRes] = await Promise.all([
+    supabaseClient.from("courses").select("*").eq("id", courseId).single(),
+    supabaseClient.from("lessons").select("*").eq("course_id", courseId).order("sort_order"),
+    supabaseClient.rpc("course_rating_stats", { course_uuid: courseId })
+  ]);
+  if(courseRes.error){ logError("جلب الكورس", courseRes.error); return; }
+  const lessons = lessonsRes.data || [];
+  const rating = ratingRes.data?.[0] || { avg_rating: 0, total_ratings: 0 };
+  const { data: myRating } = await supabaseClient.from("course_ratings").select("*").eq("course_id", courseId).eq("student_id", CURRENT_PROFILE.id).maybeSingle();
+
+  document.getElementById("course-player-body").innerHTML = `
+    <div class="course-player-head">
+      <h2>${escapeHtml(courseTitle)}</h2>
+      <div class="player-meta">
+        <span>⭐ ${rating.avg_rating} (${rating.total_ratings} تقييم)</span>
+        <span>📹 ${lessons.length} فيديو</span>
+      </div>
+    </div>
+    <div class="lessons-list">
+      ${lessons.length ? lessons.map((l, i) => `
+        <div class="lesson-item" onclick='playLesson(${JSON.stringify(l).replace(/'/g,"&#39;")})'>
+          <div class="lesson-thumb">
+            ${l.thumbnail_url ? `<img src="${l.thumbnail_url}">` : getVideoThumbnail(l.video_type, l.video_url) ? `<img src="${getVideoThumbnail(l.video_type, l.video_url)}">` : `<div class="lesson-placeholder">🎬</div>`}
+            <div class="lesson-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+            <span class="lesson-num">${i+1}</span>
+          </div>
+          <div class="lesson-info">
+            <h4>${escapeHtml(l.title_ar)}</h4>
+            ${l.description_ar ? `<p>${escapeHtml(l.description_ar)}</p>` : ""}
+            ${l.duration_min ? `<span class="lesson-duration">⏱️ ${l.duration_min} دقيقة</span>` : ""}
+          </div>
+        </div>
+      `).join("") : `<div class="empty-state">لسه مفيش فيديوهات</div>`}
+    </div>
+    <div class="course-rating-section">
+      <h3>⭐ قيّم الكورس</h3>
+      <div class="rating-stars" id="rating-stars">
+        ${[1,2,3,4,5].map(n => `<span class="star ${myRating && myRating.rating >= n ? "active" : ""}" onclick="submitRating('${courseId}', ${n})">★</span>`).join("")}
+      </div>
+      ${myRating ? `<p class="rating-thanks">شكراً لتقييمك 💛</p>` : ""}
+    </div>`;
+  document.getElementById("course-player-overlay").classList.add("open");
+}
+window.openCoursePlayer = openCoursePlayer;
+
+function playLesson(lesson){
+  const player = document.getElementById("video-player");
+  const placeholder = document.getElementById("video-placeholder");
+  document.getElementById("video-title").textContent = lesson.title_ar || "";
+  document.getElementById("video-desc").textContent = lesson.description_ar || "";
+  let html = "";
+  if(lesson.video_type === "youtube"){
+    const ytId = extractYouTubeId(lesson.video_url);
+    if(ytId) html = `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+  } else if(lesson.video_type === "vimeo"){
+    const m = lesson.video_url.match(/vimeo\.com\/(\d+)/);
+    if(m) html = `<iframe src="https://player.vimeo.com/video/${m[1]}?autoplay=1" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen"></iframe>`;
+  } else if(lesson.video_type === "drive"){
+    const m = lesson.video_url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([A-Za-z0-9_-]+)/);
+    if(m) html = `<iframe src="https://drive.google.com/file/d/${m[1]}/preview" width="100%" height="100%" frameborder="0" allow="autoplay"></iframe>`;
+  } else {
+    html = `<video src="${lesson.video_url}" controls autoplay style="width:100%;height:100%;"></video>`;
+  }
+  if(!html){
+    player.innerHTML = `<div style="color:#fff;padding:20px;text-align:center;"><p>⚠️ الرابط غلط</p><a href="${lesson.video_url}" target="_blank" style="color:var(--gold-soft);">افتح الرابط خارج الموقع</a></div>`;
+  } else {
+    player.innerHTML = html;
+  }
+  placeholder.style.display = "none";
+  player.style.display = "block";
+  if(CURRENT_PROFILE){
+    supabaseClient.from("lesson_progress").upsert({lesson_id: lesson.id, student_id: CURRENT_PROFILE.id, watched: true},{onConflict:"lesson_id,student_id"}).then(()=>{});
+  }
+}
+window.playLesson = playLesson;
+
+async function submitRating(courseId, rating){
+  if(!CURRENT_PROFILE){ showToast("⚠️ سجل دخول", "error"); return; }
+  const { error } = await supabaseClient.from("course_ratings").upsert({course_id: courseId, student_id: CURRENT_PROFILE.id, rating: rating}, { onConflict: "course_id,student_id" });
+  if(error){ logError("حفظ التقييم", error); return; }
+  showToast("✅ شكراً لتقييمك", "ok", 2000);
+  document.querySelectorAll("#rating-stars .star").forEach((s, i) => s.classList.toggle("active", i < rating));
+}
+window.submitRating = submitRating;
+
+function closeCoursePlayer(){
+  document.getElementById("course-player-overlay").classList.remove("open");
+  const player = document.getElementById("video-player");
+  if(player) player.innerHTML = "";
+}
+window.closeCoursePlayer = closeCoursePlayer;
+
+/* ===== Packages ===== */
 async function loadPackages(){
   const {data,error}=await supabaseClient.from("packages").select("*, grade_levels(name_ar)");
   if(error){logError("تحميل الباقات",error);return;}
@@ -543,6 +878,7 @@ function openPackageForm(pkg){
   });
 }
 
+/* ===== Students ===== */
 function openAddStudentForm(){
   if(!CURRENT_LEVELS.length){showToast("⚠️ أضف مرحلة أول","error");return;}
   document.getElementById("form-modal-content").innerHTML=`<button class="close" onclick="closeFormModal()">✕</button><h3>إضافة طالب</h3><form id="add-student-form"><div class="field"><label>الاسم</label><input type="text" id="as-name" required></div><div class="field"><label>الإيميل</label><input type="email" id="as-email" required></div><div class="field"><label>الهاتف</label><input type="tel" id="as-phone"></div><div class="field"><label>كلمة مرور</label><input type="text" id="as-password" required minlength="6"></div><div class="field"><label>المرحلة</label><select id="as-level">${levelOptions()}</select></div><button class="btn btn-gold btn-block" type="submit">إنشاء</button><div class="form-msg" id="add-student-msg"></div></form>`;
@@ -614,6 +950,7 @@ function openSubscriptionForm(studentId,studentName){
   });
 }
 
+/* ===== Settings ===== */
 async function loadOwnerSettings(){
   fillCountrySelect("20");
   const {data,error}=await supabaseClient.from("settings").select("*").eq("id",1).maybeSingle();
@@ -632,7 +969,7 @@ async function saveSettings(e){
   if(!full){showToast("⚠️ رقم غلط","error");return;}
   const {error}=await supabaseClient.from("settings").update({owner_name:document.getElementById("set-owner-name").value.trim()||"ms. sherehan ali",whatsapp_number:full}).eq("id",1);
   if(error){logError("حفظ الإعدادات",error);return;}
-  logOk("الإعدادات","تم الحفظ: "+full);
+  logOk("الإعدادات","تم الحفظ");
   await wireWhatsAppButton();
 }
 function closeFormModal(){document.getElementById("form-overlay").classList.remove("open");}
@@ -643,43 +980,83 @@ async function deleteRow(table,id,refreshFn){
   await refreshFn();await loadKpis();
 }
 
-function getYouTubeId(url){
-  if(!url)return null;
-  const p=[/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,/^([A-Za-z0-9_-]{11})$/];
-  for(const x of p){const m=url.match(x);if(m)return m[1];}
-  return null;
+/* ===== Search ===== */
+function filterCourses(){
+  const q = (document.getElementById("search-input")?.value || "").toLowerCase();
+  const cards = document.querySelectorAll("#packages-grid .course-card, #levels-grid .course-card");
+  cards.forEach(card => {
+    const t = (card.querySelector("h3")?.textContent || "").toLowerCase();
+    card.style.display = t.includes(q) ? "" : "none";
+  });
 }
-function getVideoInfo(course){
-  const url=(course?.content_url||"").trim();
-  if(!url)return null;
-  const ytId=getYouTubeId(url);
-  if(ytId)return{kind:"youtube",thumbnail:`https://img.youtube.com/vi/${ytId}/hqdefault.jpg`,watchUrl:`https://www.youtube.com/watch?v=${ytId}`};
-  if(/\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url))return{kind:"video-file",thumbnail:null,watchUrl:url};
-  return null;
+window.filterCourses = filterCourses;
+
+function filterStudentCourses(){
+  const q = (document.getElementById("student-search-input")?.value || "").toLowerCase();
+  const cards = document.querySelectorAll("#courses-grid .course-card");
+  cards.forEach(card => {
+    const t = (card.querySelector("h3")?.textContent || "").toLowerCase();
+    card.style.display = t.includes(q) ? "" : "none";
+  });
 }
-function buildCourseCard(course,lang){
-  const title=lang==="ar"?course.title_ar:(course.title_en||course.title_ar);
-  const desc=lang==="ar"?(course.description_ar||""):"";
-  const isFile=course.content_type==="file";
-  const video=getVideoInfo(course);
-  let thumbHTML="",actionLabel="",targetUrl=course.content_url;
-  if(video?.kind==="youtube"){
-    targetUrl=video.watchUrl;
-    thumbHTML=`<a class="course-thumb" href="${targetUrl}" target="_blank"><img src="${video.thumbnail}" loading="lazy"><div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div><span class="video-badge">▶ فيديو</span></a>`;
-    actionLabel="▶️ مشاهدة";
-  }else if(video?.kind==="video-file"){
-    thumbHTML=`<a class="course-thumb" href="${targetUrl}" target="_blank"><video src="${targetUrl}#t=0.5" preload="metadata" muted playsinline></video><div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div><span class="video-badge">▶ فيديو</span></a>`;
-    actionLabel="▶️ مشاهدة";
-  }else if(isFile){
-    thumbHTML=`<div class="course-thumb file-thumb"><div class="file-icon">📄</div></div>`;
-    actionLabel="⬇️ تحميل";
-  }else{
-    thumbHTML=`<div class="course-thumb file-thumb"><div class="file-icon">🔗</div></div>`;
-    actionLabel="🔗 فتح";
-  }
-  return `<div class="card course-card">${thumbHTML}<div class="course-body"><h3>${title}</h3><p>${desc}</p><a class="btn btn-teal btn-block" href="${targetUrl}" target="_blank" ${isFile&&!video?"download":""}>${actionLabel}</a></div></div>`;
+window.filterStudentCourses = filterStudentCourses;
+
+/* ===== Course Card (للطالب) ===== */
+function buildCourseCard(course, lang){
+  const title = lang === "ar" ? course.title_ar : (course.title_en || course.title_ar);
+  const desc  = lang === "ar" ? (course.description_ar || "") : (course.description_en || "");
+  const video = getVideoInfo(course);
+
+  let thumbHTML = "";
+  if (video?.kind === "youtube"){ thumbHTML = `<img src="${video.thumbnail}" alt="${title}" loading="lazy">`; }
+  else if (video?.kind === "drive"){ thumbHTML = `<img src="${video.thumbnail}" alt="${title}" loading="lazy">`; }
+  else if (video?.kind === "video-file"){ thumbHTML = `<video src="${video.watchUrl}#t=0.5" preload="metadata" muted playsinline></video>`; }
+  else { thumbHTML = `<div class="file-thumb"><div class="file-icon">🎬</div></div>`; }
+
+  return `
+    <div class="card course-card">
+      <div class="course-thumb">
+        ${thumbHTML}
+        <div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+        <span class="video-badge">🎬 كورس</span>
+      </div>
+      <div class="course-body">
+        <h3>${title}</h3>
+        <p>${desc}</p>
+        <button class="btn btn-teal btn-block" onclick='openCoursePlayer("${course.id}", ${JSON.stringify(title)})'>🎬 مشاهدة الكورس</button>
+        <button class="btn btn-ghost btn-block btn-sm" style="margin-top:6px;" onclick='openRatingModal("${course.id}", ${JSON.stringify(title)})'>⭐ قيّم الكورس</button>
+      </div>
+    </div>`;
 }
 
+/* ===== Modal تقييم منفصل ===== */
+async function openRatingModal(courseId, courseTitle){
+  const { data: myRating } = await supabaseClient.from("course_ratings").select("*").eq("course_id", courseId).eq("student_id", CURRENT_PROFILE.id).maybeSingle();
+  document.getElementById("form-modal-content").innerHTML = `
+    <button class="close" onclick="closeFormModal()">✕</button>
+    <h3>⭐ قيّم "${escapeHtml(courseTitle)}"</h3>
+    <div style="text-align:center;padding:20px 0;">
+      <div class="rating-stars" id="rating-stars-modal" style="justify-content:center;display:flex;gap:10px;">
+        ${[1,2,3,4,5].map(n => `<span class="star ${myRating && myRating.rating >= n ? "active" : ""}" onclick="submitRatingModal('${courseId}', ${n})">★</span>`).join("")}
+      </div>
+      <p id="rating-modal-msg" style="margin-top:14px;color:var(--teal);font-weight:700;">
+        ${myRating ? "شكراً لتقييمك 💛" : "اضغط على النجوم"}
+      </p>
+    </div>`;
+  document.getElementById("form-overlay").classList.add("open");
+}
+window.openRatingModal = openRatingModal;
+
+async function submitRatingModal(courseId, rating){
+  const { error } = await supabaseClient.from("course_ratings").upsert({course_id: courseId, student_id: CURRENT_PROFILE.id, rating: rating}, { onConflict: "course_id,student_id" });
+  if(error){ logError("حفظ التقييم", error); return; }
+  document.querySelectorAll("#rating-stars-modal .star").forEach((s, i) => s.classList.toggle("active", i < rating));
+  document.getElementById("rating-modal-msg").textContent = "✅ شكراً لتقييمك 💛";
+  showToast("✅ تم التقييم", "ok", 1500);
+}
+window.submitRatingModal = submitRatingModal;
+
+/* ===== Student Dashboard ===== */
 async function loadStudentDashboard(profile){
   const lang=localStorage.getItem("basetna_lang")||"ar";
   document.getElementById("welcome-msg").textContent=(lang==="en"?"Welcome, ":"أهلاً بيك يا ")+profile.full_name;
@@ -706,41 +1083,28 @@ async function loadStudentDashboard(profile){
   grid.innerHTML=courses.map(c=>buildCourseCard(c,lang)).join("");
 }
 
+/* ===== Init ===== */
 async function initApp(){
-  console.log("🚀 initApp START");
   const {data:{session},error:sessErr}=await supabaseClient.auth.getSession();
   if(sessErr){logError("فحص الجلسة",sessErr);showView("public");await loadHome();await wireWhatsAppButton();return;}
-  if(!session){console.log("🚪 No session → public");showView("public");await loadHome();await wireWhatsAppButton();return;}
-  console.log("👤 User:", session.user.email);
+  if(!session){showView("public");await loadHome();await wireWhatsAppButton();return;}
 
   const profRes=await supabaseClient.from("profiles").select("*").eq("id",session.user.id).maybeSingle();
   if(profRes.error){logError("تحميل البروفايل",profRes.error);showView("public");await loadHome();await wireWhatsAppButton();return;}
   if(!profRes.data){showToast("⚠️ مفيش بروفايل","error",8000);showView("public");await loadHome();await wireWhatsAppButton();return;}
   CURRENT_PROFILE=profRes.data;
-  console.log("✅ Profile:", CURRENT_PROFILE.full_name, "| Role:", CURRENT_PROFILE.role);
 
   const isYassen = CURRENT_PROFILE.full_name && (CURRENT_PROFILE.full_name.includes("Yassen") || CURRENT_PROFILE.full_name.includes("ياسين"));
-  console.log("isYassen:", isYassen, "| VIEW_MODE:", VIEW_MODE);
 
   if(isYassen && !VIEW_MODE){
-    console.log("🎭 Showing Role Picker");
     showView("owner");
-    // نعرض المودال بعد ما الصفحة تتحمّل
-    setTimeout(() => {
-      if(typeof showRolePicker === "function"){
-        showRolePicker();
-      } else {
-        console.error("❌ showRolePicker not defined!");
-      }
-    }, 500);
+    setTimeout(() => showRolePicker(), 500);
     return;
   }
   applyRoleMode();
   const effectiveRole = CURRENT_PROFILE.effectiveRole || CURRENT_PROFILE.role;
-  console.log("🎯 effectiveRole:", effectiveRole);
 
   if(ADMIN_ROLES.includes(effectiveRole)){
-    console.log("👑 Admin mode");
     showView("owner");
     wireOwnerTabs();
     hideSupportFabsForRole(effectiveRole);
@@ -748,18 +1112,15 @@ async function initApp(){
     else {document.body.classList.remove("is-superadmin");}
     await refreshOwnerData();
   } else {
-    console.log("🎓 Student mode");
     showView("student");
     hideSupportFabsForRole("student");
     await loadStudentDashboard(CURRENT_PROFILE);
   }
   await wireWhatsAppButton();
   updateRoleUI();
-  console.log("✅ initApp DONE");
 }
 
 document.addEventListener("DOMContentLoaded",async()=>{
-  console.log("🚀 DOMContentLoaded");
   applyLanguage(localStorage.getItem("basetna_lang")||"ar");
   document.querySelectorAll(".lang-switch").forEach(btn=>btn.addEventListener("click",toggleLanguage));
   document.getElementById("login-form")?.addEventListener("submit",handleLogin);
@@ -780,320 +1141,3 @@ window.addEventListener("unhandledrejection",(e)=>{
 
 window.supabaseClient = supabaseClient;
 window.CURRENT_PROFILE = () => CURRENT_PROFILE;
-/* ============================================================
-   🆕 إضافات v20 — كورسات كسلسلة فيديوهات + تقييمات + بحث
-   ============================================================ */
-
-/* ===== Video Helpers ===== */
-function extractYouTubeId(url){
-  if(!url) return null;
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,
-    /^([A-Za-z0-9_-]{11})$/
-  ];
-  for(const p of patterns){const m=url.match(p);if(m)return m[1];}
-  return null;
-}
-function getVideoThumbnail(type, url){
-  if(type === "youtube"){const id = extractYouTubeId(url);return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;}
-  if(type === "drive"){const m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([A-Za-z0-9_-]+)/);return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w800` : null;}
-  return null;
-}
-
-/* ===== Course Player Modal ===== */
-async function openCoursePlayer(courseId, courseTitle){
-  const [courseRes, lessonsRes, ratingRes] = await Promise.all([
-    supabaseClient.from("courses").select("*").eq("id", courseId).single(),
-    supabaseClient.from("lessons").select("*").eq("course_id", courseId).order("sort_order"),
-    supabaseClient.rpc("course_rating_stats", { course_uuid: courseId })
-  ]);
-  if(courseRes.error){ logError("جلب الكورس", courseRes.error); return; }
-  const lessons = lessonsRes.data || [];
-  const rating = ratingRes.data?.[0] || { avg_rating: 0, total_ratings: 0 };
-  const { data: myRating } = await supabaseClient
-    .from("course_ratings").select("*")
-    .eq("course_id", courseId).eq("student_id", CURRENT_PROFILE.id).maybeSingle();
-
-  document.getElementById("course-player-body").innerHTML = `
-    <div class="course-player-head">
-      <h2>${escapeHtml(courseTitle)}</h2>
-      <div class="player-meta">
-        <span>⭐ ${rating.avg_rating} (${rating.total_ratings} تقييم)</span>
-        <span>📹 ${lessons.length} فيديو</span>
-      </div>
-    </div>
-    <div class="lessons-list">
-      ${lessons.length ? lessons.map((l, i) => `
-        <div class="lesson-item" onclick='playLesson(${JSON.stringify(l).replace(/'/g,"&#39;")})'>
-          <div class="lesson-thumb">
-            ${l.thumbnail_url
-              ? `<img src="${l.thumbnail_url}" alt="${escapeHtml(l.title_ar)}">`
-              : getVideoThumbnail(l.video_type, l.video_url)
-                ? `<img src="${getVideoThumbnail(l.video_type, l.video_url)}" alt="${escapeHtml(l.title_ar)}">`
-                : `<div class="lesson-placeholder">🎬</div>`}
-            <div class="lesson-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-            <span class="lesson-num">${i+1}</span>
-          </div>
-          <div class="lesson-info">
-            <h4>${escapeHtml(l.title_ar)}</h4>
-            ${l.description_ar ? `<p>${escapeHtml(l.description_ar)}</p>` : ""}
-            ${l.duration_min ? `<span class="lesson-duration">⏱️ ${l.duration_min} دقيقة</span>` : ""}
-          </div>
-        </div>
-      `).join("") : `<div class="empty-state">لسه مفيش فيديوهات</div>`}
-    </div>
-    <div class="course-rating-section">
-      <h3>⭐ قيّم الكورس</h3>
-      <div class="rating-stars" id="rating-stars">
-        ${[1,2,3,4,5].map(n => `<span class="star ${myRating && myRating.rating >= n ? "active" : ""}" onclick="submitRating('${courseId}', ${n})">★</span>`).join("")}
-      </div>
-      ${myRating ? `<p class="rating-thanks">شكراً لتقييمك 💛</p>` : ""}
-    </div>`;
-  document.getElementById("course-player-overlay").classList.add("open");
-}
-window.openCoursePlayer = openCoursePlayer;
-
-function playLesson(lesson){
-  const player = document.getElementById("video-player");
-  const placeholder = document.getElementById("video-placeholder");
-  document.getElementById("video-title").textContent = lesson.title_ar || "";
-  document.getElementById("video-desc").textContent = lesson.description_ar || "";
-  if(lesson.video_type === "youtube"){
-    const ytId = extractYouTubeId(lesson.video_url);
-    if(ytId){
-      player.innerHTML = `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
-    }
-  } else if(lesson.video_type === "vimeo"){
-    const m = lesson.video_url.match(/vimeo\.com\/(\d+)/);
-    if(m) player.innerHTML = `<iframe src="https://player.vimeo.com/video/${m[1]}?autoplay=1" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen"></iframe>`;
-  } else {
-    player.innerHTML = `<video src="${lesson.video_url}" controls autoplay style="width:100%;height:100%;"></video>`;
-  }
-  placeholder.style.display = "none";
-  player.style.display = "block";
-  supabaseClient.from("lesson_progress").upsert({lesson_id: lesson.id, student_id: CURRENT_PROFILE.id, watched: true},{onConflict:"lesson_id,student_id"}).then(()=>{});
-}
-window.playLesson = playLesson;
-
-async function submitRating(courseId, rating){
-  if(!CURRENT_PROFILE){ showToast("⚠️ سجل دخول", "error"); return; }
-  const { error } = await supabaseClient.from("course_ratings").upsert({
-    course_id: courseId, student_id: CURRENT_PROFILE.id, rating: rating
-  }, { onConflict: "course_id,student_id" });
-  if(error){ logError("حفظ التقييم", error); return; }
-  showToast("✅ شكراً لتقييمك", "ok", 2000);
-  document.querySelectorAll("#rating-stars .star").forEach((s, i) => s.classList.toggle("active", i < rating));
-}
-window.submitRating = submitRating;
-
-function closeCoursePlayer(){
-  document.getElementById("course-player-overlay").classList.remove("open");
-  const player = document.getElementById("video-player");
-  if(player) player.innerHTML = "";
-}
-window.closeCoursePlayer = closeCoursePlayer;
-
-/* ===== Admin: إدارة فيديوهات الكورس ===== */
-async function openLessonsManager(courseId, courseTitle){
-  const { data: lessons } = await supabaseClient.from("lessons").select("*").eq("course_id", courseId).order("sort_order");
-  const list = lessons || [];
-  document.getElementById("form-modal-content").innerHTML = `
-    <button class="close" onclick="closeFormModal()">✕</button>
-    <h3>🎬 فيديوهات: ${escapeHtml(courseTitle)}</h3>
-    <button class="btn btn-gold btn-block" style="margin-bottom:14px;" onclick='openLessonForm("${courseId}")'>➕ إضافة فيديو</button>
-    <div style="max-height:60vh;overflow-y:auto;">
-      ${list.length ? list.map(l => `
-        <div style="background:var(--paper-2);padding:12px;border-radius:8px;margin-bottom:8px;display:flex;gap:10px;align-items:center;">
-          ${getVideoThumbnail(l.video_type, l.video_url) ? `<img src="${getVideoThumbnail(l.video_type, l.video_url)}" style="width:70px;height:44px;object-fit:cover;border-radius:6px;">` : `<div style="width:70px;height:44px;background:var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;">🎬</div>`}
-          <div style="flex:1;min-width:0;">
-            <b style="color:var(--navy-deep);font-size:14px;">${escapeHtml(l.title_ar)}</b>
-            ${l.description_ar ? `<div style="font-size:12px;color:var(--ink-soft);">${escapeHtml(l.description_ar)}</div>` : ""}
-          </div>
-          <button class="icon-btn danger" onclick='deleteLesson("${l.id}","${courseId}","${escapeHtml(courseTitle).replace(/'/g,"&#39;")}")'>🗑️</button>
-        </div>
-      `).join("") : `<div class="empty-state">لسه مفيش فيديوهات</div>`}
-    </div>`;
-  document.getElementById("form-overlay").classList.add("open");
-}
-window.openLessonsManager = openLessonsManager;
-
-function openLessonForm(courseId){
-  document.getElementById("form-modal-content").innerHTML = `
-    <button class="close" onclick="closeFormModal()">✕</button>
-    <h3>➕ إضافة فيديو</h3>
-    <form id="lesson-form">
-      <div class="field"><label>عنوان الفيديو (عربي)</label><input type="text" id="ls-title" required></div>
-      <div class="field"><label>وصف مختصر</label><textarea id="ls-desc" rows="2"></textarea></div>
-      <div class="field"><label>نوع الفيديو</label>
-        <select id="ls-type">
-          <option value="youtube">يوتيوب</option>
-          <option value="vimeo">فيميو</option>
-          <option value="drive">جوجل درايف</option>
-          <option value="file">ملف مرفوع</option>
-        </select></div>
-      <div class="field" id="ls-url-field"><label>رابط الفيديو</label><input type="url" id="ls-url" placeholder="https://youtu.be/..."></div>
-      <div class="field" id="ls-file-field" hidden><label>اختر ملف الفيديو</label><input type="file" id="ls-file" accept="video/*"></div>
-      <div class="field"><label>المدة (بالدقايق)</label><input type="number" id="ls-duration" value="0"></div>
-      <div class="field"><label>الترتيب</label><input type="number" id="ls-order" value="0"></div>
-      <button class="btn btn-gold btn-block" type="submit">💾 حفظ</button>
-      <div class="form-msg" id="ls-msg"></div>
-    </form>`;
-  const typeSel = document.getElementById("ls-type");
-  const toggleType = () => {
-    const isFile = typeSel.value === "file";
-    document.getElementById("ls-url-field").hidden = isFile;
-    document.getElementById("ls-file-field").hidden = !isFile;
-  };
-  typeSel.addEventListener("change", toggleType); toggleType();
-
-  document.getElementById("lesson-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const msg = document.getElementById("ls-msg");
-    let videoUrl = document.getElementById("ls-url").value.trim();
-    const type = typeSel.value;
-    if(type === "file"){
-      const file = document.getElementById("ls-file").files[0];
-      if(!file){ showMsg(msg, "اختار ملف", "error"); return; }
-      showMsg(msg, "⏳ جاري الرفع...", "ok");
-      const path = `lessons/${Date.now()}_${file.name}`;
-      const { error: upErr } = await supabaseClient.storage.from(STORAGE_BUCKET).upload(path, file);
-      if(upErr){ showMsg(msg, "فشل الرفع: " + friendlyError(upErr), "error"); return; }
-      videoUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
-    }
-    const payload = {
-      course_id: courseId,
-      title_ar: document.getElementById("ls-title").value.trim(),
-      description_ar: document.getElementById("ls-desc").value.trim(),
-      video_type: type,
-      video_url: videoUrl,
-      duration_min: Number(document.getElementById("ls-duration").value) || 0,
-      sort_order: Number(document.getElementById("ls-order").value) || 0
-    };
-    const { error } = await supabaseClient.from("lessons").insert(payload);
-    if(error){ showMsg(msg, friendlyError(error), "error"); return; }
-    logOk("الفيديو", "تمت الإضافة");
-    closeFormModal();
-  });
-}
-window.openLessonForm = openLessonForm;
-
-async function deleteLesson(id, courseId, courseTitle){
-  if(!confirm("متأكدة؟")) return;
-  const { error } = await supabaseClient.from("lessons").delete().eq("id", id);
-  if(error){ logError("حذف الفيديو", error); return; }
-  logOk("الفيديو", "تم الحذف");
-  openLessonsManager(courseId, courseTitle);
-}
-window.deleteLesson = deleteLesson;
-
-/* ===== البحث ===== */
-function filterCourses(){
-  const q = (document.getElementById("search-input")?.value || "").toLowerCase();
-  const filtered = ALL_COURSES_CACHE.filter(c =>
-    (c.title_ar || "").toLowerCase().includes(q) ||
-    (c.title_en || "").toLowerCase().includes(q) ||
-    (c.description_ar || "").toLowerCase().includes(q)
-  );
-  renderHomeCourses(filtered);
-}
-window.filterCourses = filterCourses;
-
-function filterStudentCourses(){
-  const q = (document.getElementById("student-search-input")?.value || "").toLowerCase();
-  const cards = document.querySelectorAll("#courses-grid .course-card");
-  cards.forEach(card => {
-    const title = (card.querySelector("h3")?.textContent || "").toLowerCase();
-    card.style.display = title.includes(q) ? "" : "none";
-  });
-}
-window.filterStudentCourses = filterStudentCourses;
-
-function renderHomeCourses(courses){
-  const grid = document.getElementById("packages-grid");
-  // نستخدم packages-grid للعرض لو محتاجين
-}
-
-/* ===== التقارير والإحصائيات ===== */
-async function loadStats(){
-  const el = document.getElementById("stats-content");
-  if(!el) return;
-  el.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
-
-  const [levelsStats, lessonsStats, ratingsRes] = await Promise.all([
-    supabaseClient.rpc("stats_students_per_level"),
-    supabaseClient.rpc("stats_lessons_per_course"),
-    supabaseClient.from("course_ratings").select("rating, course_id, courses(title_ar)")
-  ]);
-
-  if(levelsStats.error) logError("إحصائيات المراحل", levelsStats.error);
-  if(lessonsStats.error) logError("إحصائيات الدروس", lessonsStats.error);
-
-  const levels = levelsStats.data || [];
-  const coursesStats = lessonsStats.data || [];
-  const ratings = ratingsRes.data || [];
-
-  // إجماليات
-  const totalStudents = levels.reduce((a, l) => a + Number(l.students_count || 0), 0);
-  const totalActive = levels.reduce((a, l) => a + Number(l.active_subs || 0), 0);
-  const totalRatings = ratings.length;
-  const avgAll = totalRatings ? (ratings.reduce((a,r) => a + r.rating, 0) / totalRatings).toFixed(1) : "—";
-
-  el.innerHTML = `
-    <div class="kpi-row" style="margin-bottom:24px;">
-      <div class="kpi"><div class="num">${totalStudents}</div><div class="label">👥 إجمالي الطلاب</div></div>
-      <div class="kpi"><div class="num">${totalActive}</div><div class="label">✅ اشتراكات فعّالة</div></div>
-      <div class="kpi"><div class="num">${coursesStats.length}</div><div class="label">📚 الكورسات</div></div>
-      <div class="kpi"><div class="num">${avgAll}</div><div class="label">⭐ متوسط التقييم</div></div>
-    </div>
-
-    <div class="card" style="margin-bottom:20px;">
-      <h3 style="color:var(--navy-deep);margin:0 0 14px;">📊 الطلاب لكل مرحلة</h3>
-      ${levels.length ? `
-        <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="background:var(--paper-2);">
-            <th style="padding:10px;text-align:start;">المرحلة</th>
-            <th style="padding:10px;text-align:start;">عدد الطلاب</th>
-            <th style="padding:10px;text-align:start;">اشتراكات فعّالة</th>
-            <th style="padding:10px;text-align:start;">النسبة</th>
-          </tr></thead>
-          <tbody>
-            ${levels.map(l => {
-              const pct = l.students_count > 0 ? Math.round((Number(l.active_subs) / Number(l.students_count)) * 100) : 0;
-              return `<tr>
-                <td style="padding:10px;border-bottom:1px solid var(--line);">${escapeHtml(l.level_name)}</td>
-                <td style="padding:10px;border-bottom:1px solid var(--line);"><b>${l.students_count}</b></td>
-                <td style="padding:10px;border-bottom:1px solid var(--line);">${l.active_subs}</td>
-                <td style="padding:10px;border-bottom:1px solid var(--line);">
-                  <div style="background:var(--paper-2);border-radius:999px;overflow:hidden;height:8px;width:100px;">
-                    <div style="background:linear-gradient(90deg,var(--teal),var(--gold));height:100%;width:${pct}%;"></div>
-                  </div>
-                  <span style="font-size:12px;color:var(--ink-soft);">${pct}%</span>
-                </td>
-              </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
-      ` : `<div class="empty-state">مفيش بيانات</div>`}
-    </div>
-
-    <div class="card">
-      <h3 style="color:var(--navy-deep);margin:0 0 14px;">🎬 الكورسات والفيديوهات</h3>
-      ${coursesStats.length ? `
-        <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="background:var(--paper-2);">
-            <th style="padding:10px;text-align:start;">الكورس</th>
-            <th style="padding:10px;text-align:start;">عدد الفيديوهات</th>
-            <th style="padding:10px;text-align:start;">⭐ التقييم</th>
-          </tr></thead>
-          <tbody>
-            ${coursesStats.map(c => `<tr>
-              <td style="padding:10px;border-bottom:1px solid var(--line);">${escapeHtml(c.course_title)}</td>
-              <td style="padding:10px;border-bottom:1px solid var(--line);"><b>${c.lessons_count}</b></td>
-              <td style="padding:10px;border-bottom:1px solid var(--line);">${c.avg_rating} ⭐</td>
-            </tr>`).join("")}
-          </tbody>
-        </table>
-      ` : `<div class="empty-state">مفيش كورسات لسه</div>`}
-    </div>`;
-}
-window.loadStats = loadStats;

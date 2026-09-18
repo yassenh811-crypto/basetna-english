@@ -780,3 +780,320 @@ window.addEventListener("unhandledrejection",(e)=>{
 
 window.supabaseClient = supabaseClient;
 window.CURRENT_PROFILE = () => CURRENT_PROFILE;
+/* ============================================================
+   🆕 إضافات v20 — كورسات كسلسلة فيديوهات + تقييمات + بحث
+   ============================================================ */
+
+/* ===== Video Helpers ===== */
+function extractYouTubeId(url){
+  if(!url) return null;
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,
+    /^([A-Za-z0-9_-]{11})$/
+  ];
+  for(const p of patterns){const m=url.match(p);if(m)return m[1];}
+  return null;
+}
+function getVideoThumbnail(type, url){
+  if(type === "youtube"){const id = extractYouTubeId(url);return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;}
+  if(type === "drive"){const m = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([A-Za-z0-9_-]+)/);return m ? `https://drive.google.com/thumbnail?id=${m[1]}&sz=w800` : null;}
+  return null;
+}
+
+/* ===== Course Player Modal ===== */
+async function openCoursePlayer(courseId, courseTitle){
+  const [courseRes, lessonsRes, ratingRes] = await Promise.all([
+    supabaseClient.from("courses").select("*").eq("id", courseId).single(),
+    supabaseClient.from("lessons").select("*").eq("course_id", courseId).order("sort_order"),
+    supabaseClient.rpc("course_rating_stats", { course_uuid: courseId })
+  ]);
+  if(courseRes.error){ logError("جلب الكورس", courseRes.error); return; }
+  const lessons = lessonsRes.data || [];
+  const rating = ratingRes.data?.[0] || { avg_rating: 0, total_ratings: 0 };
+  const { data: myRating } = await supabaseClient
+    .from("course_ratings").select("*")
+    .eq("course_id", courseId).eq("student_id", CURRENT_PROFILE.id).maybeSingle();
+
+  document.getElementById("course-player-body").innerHTML = `
+    <div class="course-player-head">
+      <h2>${escapeHtml(courseTitle)}</h2>
+      <div class="player-meta">
+        <span>⭐ ${rating.avg_rating} (${rating.total_ratings} تقييم)</span>
+        <span>📹 ${lessons.length} فيديو</span>
+      </div>
+    </div>
+    <div class="lessons-list">
+      ${lessons.length ? lessons.map((l, i) => `
+        <div class="lesson-item" onclick='playLesson(${JSON.stringify(l).replace(/'/g,"&#39;")})'>
+          <div class="lesson-thumb">
+            ${l.thumbnail_url
+              ? `<img src="${l.thumbnail_url}" alt="${escapeHtml(l.title_ar)}">`
+              : getVideoThumbnail(l.video_type, l.video_url)
+                ? `<img src="${getVideoThumbnail(l.video_type, l.video_url)}" alt="${escapeHtml(l.title_ar)}">`
+                : `<div class="lesson-placeholder">🎬</div>`}
+            <div class="lesson-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+            <span class="lesson-num">${i+1}</span>
+          </div>
+          <div class="lesson-info">
+            <h4>${escapeHtml(l.title_ar)}</h4>
+            ${l.description_ar ? `<p>${escapeHtml(l.description_ar)}</p>` : ""}
+            ${l.duration_min ? `<span class="lesson-duration">⏱️ ${l.duration_min} دقيقة</span>` : ""}
+          </div>
+        </div>
+      `).join("") : `<div class="empty-state">لسه مفيش فيديوهات</div>`}
+    </div>
+    <div class="course-rating-section">
+      <h3>⭐ قيّم الكورس</h3>
+      <div class="rating-stars" id="rating-stars">
+        ${[1,2,3,4,5].map(n => `<span class="star ${myRating && myRating.rating >= n ? "active" : ""}" onclick="submitRating('${courseId}', ${n})">★</span>`).join("")}
+      </div>
+      ${myRating ? `<p class="rating-thanks">شكراً لتقييمك 💛</p>` : ""}
+    </div>`;
+  document.getElementById("course-player-overlay").classList.add("open");
+}
+window.openCoursePlayer = openCoursePlayer;
+
+function playLesson(lesson){
+  const player = document.getElementById("video-player");
+  const placeholder = document.getElementById("video-placeholder");
+  document.getElementById("video-title").textContent = lesson.title_ar || "";
+  document.getElementById("video-desc").textContent = lesson.description_ar || "";
+  if(lesson.video_type === "youtube"){
+    const ytId = extractYouTubeId(lesson.video_url);
+    if(ytId){
+      player.innerHTML = `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    }
+  } else if(lesson.video_type === "vimeo"){
+    const m = lesson.video_url.match(/vimeo\.com\/(\d+)/);
+    if(m) player.innerHTML = `<iframe src="https://player.vimeo.com/video/${m[1]}?autoplay=1" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen"></iframe>`;
+  } else {
+    player.innerHTML = `<video src="${lesson.video_url}" controls autoplay style="width:100%;height:100%;"></video>`;
+  }
+  placeholder.style.display = "none";
+  player.style.display = "block";
+  supabaseClient.from("lesson_progress").upsert({lesson_id: lesson.id, student_id: CURRENT_PROFILE.id, watched: true},{onConflict:"lesson_id,student_id"}).then(()=>{});
+}
+window.playLesson = playLesson;
+
+async function submitRating(courseId, rating){
+  if(!CURRENT_PROFILE){ showToast("⚠️ سجل دخول", "error"); return; }
+  const { error } = await supabaseClient.from("course_ratings").upsert({
+    course_id: courseId, student_id: CURRENT_PROFILE.id, rating: rating
+  }, { onConflict: "course_id,student_id" });
+  if(error){ logError("حفظ التقييم", error); return; }
+  showToast("✅ شكراً لتقييمك", "ok", 2000);
+  document.querySelectorAll("#rating-stars .star").forEach((s, i) => s.classList.toggle("active", i < rating));
+}
+window.submitRating = submitRating;
+
+function closeCoursePlayer(){
+  document.getElementById("course-player-overlay").classList.remove("open");
+  const player = document.getElementById("video-player");
+  if(player) player.innerHTML = "";
+}
+window.closeCoursePlayer = closeCoursePlayer;
+
+/* ===== Admin: إدارة فيديوهات الكورس ===== */
+async function openLessonsManager(courseId, courseTitle){
+  const { data: lessons } = await supabaseClient.from("lessons").select("*").eq("course_id", courseId).order("sort_order");
+  const list = lessons || [];
+  document.getElementById("form-modal-content").innerHTML = `
+    <button class="close" onclick="closeFormModal()">✕</button>
+    <h3>🎬 فيديوهات: ${escapeHtml(courseTitle)}</h3>
+    <button class="btn btn-gold btn-block" style="margin-bottom:14px;" onclick='openLessonForm("${courseId}")'>➕ إضافة فيديو</button>
+    <div style="max-height:60vh;overflow-y:auto;">
+      ${list.length ? list.map(l => `
+        <div style="background:var(--paper-2);padding:12px;border-radius:8px;margin-bottom:8px;display:flex;gap:10px;align-items:center;">
+          ${getVideoThumbnail(l.video_type, l.video_url) ? `<img src="${getVideoThumbnail(l.video_type, l.video_url)}" style="width:70px;height:44px;object-fit:cover;border-radius:6px;">` : `<div style="width:70px;height:44px;background:var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;">🎬</div>`}
+          <div style="flex:1;min-width:0;">
+            <b style="color:var(--navy-deep);font-size:14px;">${escapeHtml(l.title_ar)}</b>
+            ${l.description_ar ? `<div style="font-size:12px;color:var(--ink-soft);">${escapeHtml(l.description_ar)}</div>` : ""}
+          </div>
+          <button class="icon-btn danger" onclick='deleteLesson("${l.id}","${courseId}","${escapeHtml(courseTitle).replace(/'/g,"&#39;")}")'>🗑️</button>
+        </div>
+      `).join("") : `<div class="empty-state">لسه مفيش فيديوهات</div>`}
+    </div>`;
+  document.getElementById("form-overlay").classList.add("open");
+}
+window.openLessonsManager = openLessonsManager;
+
+function openLessonForm(courseId){
+  document.getElementById("form-modal-content").innerHTML = `
+    <button class="close" onclick="closeFormModal()">✕</button>
+    <h3>➕ إضافة فيديو</h3>
+    <form id="lesson-form">
+      <div class="field"><label>عنوان الفيديو (عربي)</label><input type="text" id="ls-title" required></div>
+      <div class="field"><label>وصف مختصر</label><textarea id="ls-desc" rows="2"></textarea></div>
+      <div class="field"><label>نوع الفيديو</label>
+        <select id="ls-type">
+          <option value="youtube">يوتيوب</option>
+          <option value="vimeo">فيميو</option>
+          <option value="drive">جوجل درايف</option>
+          <option value="file">ملف مرفوع</option>
+        </select></div>
+      <div class="field" id="ls-url-field"><label>رابط الفيديو</label><input type="url" id="ls-url" placeholder="https://youtu.be/..."></div>
+      <div class="field" id="ls-file-field" hidden><label>اختر ملف الفيديو</label><input type="file" id="ls-file" accept="video/*"></div>
+      <div class="field"><label>المدة (بالدقايق)</label><input type="number" id="ls-duration" value="0"></div>
+      <div class="field"><label>الترتيب</label><input type="number" id="ls-order" value="0"></div>
+      <button class="btn btn-gold btn-block" type="submit">💾 حفظ</button>
+      <div class="form-msg" id="ls-msg"></div>
+    </form>`;
+  const typeSel = document.getElementById("ls-type");
+  const toggleType = () => {
+    const isFile = typeSel.value === "file";
+    document.getElementById("ls-url-field").hidden = isFile;
+    document.getElementById("ls-file-field").hidden = !isFile;
+  };
+  typeSel.addEventListener("change", toggleType); toggleType();
+
+  document.getElementById("lesson-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("ls-msg");
+    let videoUrl = document.getElementById("ls-url").value.trim();
+    const type = typeSel.value;
+    if(type === "file"){
+      const file = document.getElementById("ls-file").files[0];
+      if(!file){ showMsg(msg, "اختار ملف", "error"); return; }
+      showMsg(msg, "⏳ جاري الرفع...", "ok");
+      const path = `lessons/${Date.now()}_${file.name}`;
+      const { error: upErr } = await supabaseClient.storage.from(STORAGE_BUCKET).upload(path, file);
+      if(upErr){ showMsg(msg, "فشل الرفع: " + friendlyError(upErr), "error"); return; }
+      videoUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+    }
+    const payload = {
+      course_id: courseId,
+      title_ar: document.getElementById("ls-title").value.trim(),
+      description_ar: document.getElementById("ls-desc").value.trim(),
+      video_type: type,
+      video_url: videoUrl,
+      duration_min: Number(document.getElementById("ls-duration").value) || 0,
+      sort_order: Number(document.getElementById("ls-order").value) || 0
+    };
+    const { error } = await supabaseClient.from("lessons").insert(payload);
+    if(error){ showMsg(msg, friendlyError(error), "error"); return; }
+    logOk("الفيديو", "تمت الإضافة");
+    closeFormModal();
+  });
+}
+window.openLessonForm = openLessonForm;
+
+async function deleteLesson(id, courseId, courseTitle){
+  if(!confirm("متأكدة؟")) return;
+  const { error } = await supabaseClient.from("lessons").delete().eq("id", id);
+  if(error){ logError("حذف الفيديو", error); return; }
+  logOk("الفيديو", "تم الحذف");
+  openLessonsManager(courseId, courseTitle);
+}
+window.deleteLesson = deleteLesson;
+
+/* ===== البحث ===== */
+function filterCourses(){
+  const q = (document.getElementById("search-input")?.value || "").toLowerCase();
+  const filtered = ALL_COURSES_CACHE.filter(c =>
+    (c.title_ar || "").toLowerCase().includes(q) ||
+    (c.title_en || "").toLowerCase().includes(q) ||
+    (c.description_ar || "").toLowerCase().includes(q)
+  );
+  renderHomeCourses(filtered);
+}
+window.filterCourses = filterCourses;
+
+function filterStudentCourses(){
+  const q = (document.getElementById("student-search-input")?.value || "").toLowerCase();
+  const cards = document.querySelectorAll("#courses-grid .course-card");
+  cards.forEach(card => {
+    const title = (card.querySelector("h3")?.textContent || "").toLowerCase();
+    card.style.display = title.includes(q) ? "" : "none";
+  });
+}
+window.filterStudentCourses = filterStudentCourses;
+
+function renderHomeCourses(courses){
+  const grid = document.getElementById("packages-grid");
+  // نستخدم packages-grid للعرض لو محتاجين
+}
+
+/* ===== التقارير والإحصائيات ===== */
+async function loadStats(){
+  const el = document.getElementById("stats-content");
+  if(!el) return;
+  el.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
+
+  const [levelsStats, lessonsStats, ratingsRes] = await Promise.all([
+    supabaseClient.rpc("stats_students_per_level"),
+    supabaseClient.rpc("stats_lessons_per_course"),
+    supabaseClient.from("course_ratings").select("rating, course_id, courses(title_ar)")
+  ]);
+
+  if(levelsStats.error) logError("إحصائيات المراحل", levelsStats.error);
+  if(lessonsStats.error) logError("إحصائيات الدروس", lessonsStats.error);
+
+  const levels = levelsStats.data || [];
+  const coursesStats = lessonsStats.data || [];
+  const ratings = ratingsRes.data || [];
+
+  // إجماليات
+  const totalStudents = levels.reduce((a, l) => a + Number(l.students_count || 0), 0);
+  const totalActive = levels.reduce((a, l) => a + Number(l.active_subs || 0), 0);
+  const totalRatings = ratings.length;
+  const avgAll = totalRatings ? (ratings.reduce((a,r) => a + r.rating, 0) / totalRatings).toFixed(1) : "—";
+
+  el.innerHTML = `
+    <div class="kpi-row" style="margin-bottom:24px;">
+      <div class="kpi"><div class="num">${totalStudents}</div><div class="label">👥 إجمالي الطلاب</div></div>
+      <div class="kpi"><div class="num">${totalActive}</div><div class="label">✅ اشتراكات فعّالة</div></div>
+      <div class="kpi"><div class="num">${coursesStats.length}</div><div class="label">📚 الكورسات</div></div>
+      <div class="kpi"><div class="num">${avgAll}</div><div class="label">⭐ متوسط التقييم</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <h3 style="color:var(--navy-deep);margin:0 0 14px;">📊 الطلاب لكل مرحلة</h3>
+      ${levels.length ? `
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:var(--paper-2);">
+            <th style="padding:10px;text-align:start;">المرحلة</th>
+            <th style="padding:10px;text-align:start;">عدد الطلاب</th>
+            <th style="padding:10px;text-align:start;">اشتراكات فعّالة</th>
+            <th style="padding:10px;text-align:start;">النسبة</th>
+          </tr></thead>
+          <tbody>
+            ${levels.map(l => {
+              const pct = l.students_count > 0 ? Math.round((Number(l.active_subs) / Number(l.students_count)) * 100) : 0;
+              return `<tr>
+                <td style="padding:10px;border-bottom:1px solid var(--line);">${escapeHtml(l.level_name)}</td>
+                <td style="padding:10px;border-bottom:1px solid var(--line);"><b>${l.students_count}</b></td>
+                <td style="padding:10px;border-bottom:1px solid var(--line);">${l.active_subs}</td>
+                <td style="padding:10px;border-bottom:1px solid var(--line);">
+                  <div style="background:var(--paper-2);border-radius:999px;overflow:hidden;height:8px;width:100px;">
+                    <div style="background:linear-gradient(90deg,var(--teal),var(--gold));height:100%;width:${pct}%;"></div>
+                  </div>
+                  <span style="font-size:12px;color:var(--ink-soft);">${pct}%</span>
+                </td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      ` : `<div class="empty-state">مفيش بيانات</div>`}
+    </div>
+
+    <div class="card">
+      <h3 style="color:var(--navy-deep);margin:0 0 14px;">🎬 الكورسات والفيديوهات</h3>
+      ${coursesStats.length ? `
+        <table style="width:100%;border-collapse:collapse;">
+          <thead><tr style="background:var(--paper-2);">
+            <th style="padding:10px;text-align:start;">الكورس</th>
+            <th style="padding:10px;text-align:start;">عدد الفيديوهات</th>
+            <th style="padding:10px;text-align:start;">⭐ التقييم</th>
+          </tr></thead>
+          <tbody>
+            ${coursesStats.map(c => `<tr>
+              <td style="padding:10px;border-bottom:1px solid var(--line);">${escapeHtml(c.course_title)}</td>
+              <td style="padding:10px;border-bottom:1px solid var(--line);"><b>${c.lessons_count}</b></td>
+              <td style="padding:10px;border-bottom:1px solid var(--line);">${c.avg_rating} ⭐</td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      ` : `<div class="empty-state">مفيش كورسات لسه</div>`}
+    </div>`;
+}
+window.loadStats = loadStats;

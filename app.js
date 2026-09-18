@@ -1,10 +1,5 @@
 /* ============================================================
-   بسّطنا الإنجليزي — app.js v23 (كامل)
-   - Welcome Modal (عزيز/عزيزة) — مرة واحدة بس
-   - ياسين superadmin + Role Picker
-   - كورسات = سلسلة فيديوهات
-   - تقييمات + بحث + تقارير
-   - رفع فيديو من الموبايل
+   بسّطنا الإنجليزي — app.js v24 (كامل نهائي)
    ============================================================ */
 (function(){
   function makeMem(){
@@ -20,9 +15,6 @@
   if(!test(window.sessionStorage)){try{Object.defineProperty(window,"sessionStorage",{configurable:true,value:makeMem()});}catch(e){window.sessionStorage=makeMem();}}
 })();
 
-/* ============================================================
-   ⚙️ إعدادات
-   ============================================================ */
 const SUPABASE_URL = "https://wgostqkywpybmzgbyzeo.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_zx0zeWR2bpbmyO90oN-4ow_FxZCSPl8";
 const OWNER_USERNAME_MAP = {"yassen":"yassenq14232@gmail.com","shere":"shere@basetna-english.com"};
@@ -36,18 +28,50 @@ let CURRENT_PROFILE = null;
 let ALL_CONTACTS = [];
 let VIEW_MODE = localStorage.getItem("basetna_view_mode") || null;
 let ALL_COURSES_CACHE = [];
+let LESSONS_PROGRESS = {}; // {lesson_id: true}
+let STUDENT_RATINGS = {};
 
-/* قراءة الجندر من أي مكان (localStorage أو Cookie) */
 let USER_GENDER = (function(){
-  try {
-    const g = localStorage.getItem("basetna_gender");
-    if(g === "female" || g === "male") return g;
-  } catch(e){}
-  try {
-    const match = document.cookie.match(/basetna_gender=(female|male)/);
-    if(match) return match[1];
-  } catch(e){}
+  try { const g = localStorage.getItem("basetna_gender"); if(g === "female" || g === "male") return g; } catch(e){}
+  try { const m = document.cookie.match(/basetna_gender=(female|male)/); if(m) return m[1]; } catch(e){}
   return null;
+})();
+
+/* ============================================================
+   🌙 Dark Mode
+   ============================================================ */
+function applyDarkMode(isDark){
+  document.body.classList.toggle("dark-mode", !!isDark);
+  localStorage.setItem("basetna_dark", isDark ? "1" : "0");
+  document.querySelectorAll(".theme-btn").forEach(b => b.textContent = isDark ? "☀️" : "🌙");
+}
+function toggleDarkMode(){
+  const current = localStorage.getItem("basetna_dark") === "1";
+  applyDarkMode(!current);
+}
+window.toggleDarkMode = toggleDarkMode;
+(function initDarkMode(){
+  const saved = localStorage.getItem("basetna_dark") === "1";
+  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  applyDarkMode(saved || prefersDark);
+})();
+
+/* ============================================================
+   🎨 Student Themes
+   ============================================================ */
+function applyStudentTheme(theme){
+  document.body.classList.remove("theme-pink","theme-blue","theme-green","theme-purple");
+  if(theme && theme !== "default"){
+    document.body.classList.add("theme-" + theme);
+  }
+  localStorage.setItem("basetna_theme", theme || "default");
+}
+window.applyStudentTheme = applyStudentTheme;
+(function initTheme(){
+  const saved = localStorage.getItem("basetna_theme") || "default";
+  applyStudentTheme(saved);
+  const picker = document.getElementById("student-theme-picker");
+  if(picker) picker.value = saved;
 })();
 
 /* ============================================================
@@ -71,7 +95,6 @@ function friendlyError(err){
   if(/Failed to fetch|NetworkError|Load failed/i.test(msg))return "مشكلة في الاتصال";
   if(/duplicate key/i.test(msg))return "البيان موجود بالفعل";
   if(/Bucket not found/i.test(msg))return "Bucket مش موجود";
-  if(/exceeded.*size|too large/i.test(msg))return "الملف كبير جدًا";
   return msg;
 }
 function logError(ctx,err){console.error(`❌ [${ctx}]`,err);showToast(`⚠️ ${ctx}: ${friendlyError(err)}`,"error");}
@@ -79,7 +102,7 @@ function logOk(ctx,msg){console.log(`✅ [${ctx}]`,msg||"");if(msg)showToast(`�
 function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 /* ============================================================
-   الدول العربية
+   Countries & Language
    ============================================================ */
 const ARAB_COUNTRIES = [
   {dial:"20",ar:"مصر",en:"Egypt"},{dial:"966",ar:"السعودية",en:"Saudi Arabia"},
@@ -107,9 +130,6 @@ function splitFullPhone(full){
   return{dial:"20",local:c};
 }
 
-/* ============================================================
-   اللغة
-   ============================================================ */
 function applyLanguage(lang){
   document.documentElement.lang=lang;
   document.documentElement.dir=lang==="ar"?"rtl":"ltr";
@@ -134,25 +154,21 @@ function hideSupportFabsForRole(){document.querySelectorAll(".support-fab").forE
 function showMsg(el,text,type){el.textContent=text;el.className="form-msg "+type;}
 
 /* ============================================================
-   👋 Welcome Modal (عزيز / عزيزة) — مرة واحدة بس
+   👋 Welcome Modal
    ============================================================ */
 function pickGender(gender){
   USER_GENDER = gender;
-
-  // نخزّن في مكانين للأمان
   try { localStorage.setItem("basetna_gender", gender); } catch(e){}
-  try {
-    document.cookie = "basetna_gender=" + gender + "; max-age=31536000; path=/; SameSite=Lax";
-  } catch(e){}
-
-  // نخفي المودال
+  try { document.cookie = "basetna_gender=" + gender + "; max-age=31536000; path=/; SameSite=Lax"; } catch(e){}
   const overlay = document.getElementById("welcome-overlay");
   if(overlay) overlay.classList.remove("open");
-
+  if(CURRENT_PROFILE){
+    supabaseClient.from("profiles").update({gender}).eq("id",CURRENT_PROFILE.id).then(()=>{
+      CURRENT_PROFILE.gender = gender;
+    });
+  }
   updateWelcomeText();
-  showToast(gender === "female"
-    ? "👸 أهلاً بيكِ يا عزيزة 💛"
-    : "🤵 أهلاً بيك يا عزيز 💛", "ok", 2500);
+  showToast(gender === "female" ? "👸 أهلاً بيكِ يا عزيزة 💛" : "🤵 أهلاً بيك يا عزيز 💛", "ok", 2500);
 }
 window.pickGender = pickGender;
 
@@ -160,35 +176,22 @@ function updateWelcomeText(){
   const isFemale = USER_GENDER === "female";
   const greetWord = isFemale ? "عزيزة" : "عزيز";
   const greetEmoji = isFemale ? "👸" : "🤵";
-
   const welcomeMsg = document.getElementById("welcome-msg");
   if(welcomeMsg && CURRENT_PROFILE){
     welcomeMsg.textContent = `${greetEmoji} أهلاً بيك${isFemale ? "ِ" : ""} يا ${greetWord} ${CURRENT_PROFILE.full_name}`;
   }
-
   const heroTitle = document.getElementById("hero-title");
   if(heroTitle && !CURRENT_PROFILE && USER_GENDER){
-    heroTitle.textContent = isFemale
-      ? "الإنجليزي يبقى سهل وبسيط يا عزيزة 💛"
-      : "الإنجليزي يبقى سهل وبسيط يا عزيز 💛";
+    heroTitle.textContent = isFemale ? "الإنجليزي يبقى سهل وبسيط يا عزيزة 💛" : "الإنجليزي يبقى سهل وبسيط يا عزيز 💛";
   }
 }
 
-function getStoredGender(){
-  try {
-    const g = localStorage.getItem("basetna_gender");
-    if(g === "female" || g === "male") return g;
-  } catch(e){}
-  try {
-    const match = document.cookie.match(/basetna_gender=(female|male)/);
-    if(match) return match[1];
-  } catch(e){}
-  return null;
-}
-
 function showWelcomeModalIfNeeded(){
-  const storedGender = getStoredGender();
-
+  const storedGender = (function(){
+    try { const g = localStorage.getItem("basetna_gender"); if(g === "female" || g === "male") return g; } catch(e){}
+    try { const m = document.cookie.match(/basetna_gender=(female|male)/); if(m) return m[1]; } catch(e){}
+    return null;
+  })();
   if(storedGender){
     USER_GENDER = storedGender;
     const overlay = document.getElementById("welcome-overlay");
@@ -196,8 +199,6 @@ function showWelcomeModalIfNeeded(){
     updateWelcomeText();
     return false;
   }
-
-  // أول مرة → اعرض المودال
   const overlay = document.getElementById("welcome-overlay");
   if(overlay) overlay.classList.add("open");
   return true;
@@ -340,6 +341,104 @@ async function subscribeViaWhatsApp(packageName){
 }
 
 /* ============================================================
+   Notifications
+   ============================================================ */
+async function loadNotifications(){
+  if(!CURRENT_PROFILE) return [];
+  const notifications = [];
+  if(CURRENT_PROFILE.role === "student"){
+    const { data: subs } = await supabaseClient.from("subscriptions")
+      .select("*, packages(name_ar)").eq("student_id", CURRENT_PROFILE.id)
+      .eq("status", "active").order("end_date").limit(1);
+    if(subs?.[0]){
+      const days = Math.ceil((new Date(subs[0].end_date) - new Date()) / (1000*60*60*24));
+      if(days <= 7 && days >= 0){
+        notifications.push({
+          icon: "⏰",
+          text: `اشتراكك في "${subs[0].packages?.name_ar || 'الباقة'}" ينتهي بعد ${days} يوم`,
+          urgent: days <= 3
+        });
+      }
+    }
+  }
+  const { data: msgs } = await supabaseClient.from("messages")
+    .select("*").eq("recipient_role", CURRENT_PROFILE.role === "student" ? "student" : CURRENT_PROFILE.role)
+    .eq("is_read", false).limit(10);
+  if(msgs?.length){
+    notifications.push({icon: "💬", text: `عندك ${msgs.length} رسالة جديدة`, urgent: true});
+  }
+  return notifications;
+}
+async function openNotifications(){
+  const overlay = document.getElementById("notif-overlay");
+  const list = document.getElementById("notifications-list");
+  if(!overlay || !list) return;
+  list.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
+  overlay.classList.add("open");
+  const notifs = await loadNotifications();
+  if(!notifs.length){
+    list.innerHTML = `<div class="empty-state">مفيش إشعارات جديدة 🎉</div>`;
+  } else {
+    list.innerHTML = notifs.map(n => `
+      <div class="notif-item ${n.urgent ? 'urgent' : ''}">
+        <span class="notif-icon">${n.icon}</span>
+        <span class="notif-text">${escapeHtml(n.text)}</span>
+      </div>`).join("");
+  }
+}
+function closeNotifications(){document.getElementById("notif-overlay").classList.remove("open");}
+window.openNotifications = openNotifications;
+window.closeNotifications = closeNotifications;
+
+/* ============================================================
+   AI Assistant
+   ============================================================ */
+const FAQ_ANSWERS = [
+  {q:["اشتراك","باقة","سعر","فلوس","دفع"], a:"الاشتراكات بتتفعّل عن طريق التواصل مع المس شيرهان على الواتساب. اضغط على الزرار الأخضر تحت 👇"},
+  {q:["كورس","كورسات","محتوى","فيديو","فيديوهات"], a:"الكورسات مرتبة حسب مرحلتك الدراسية. لما تسجل دخول وتكون مشترك، هتلاقي كورساتك ظاهرة في صفحتك."},
+  {q:["تسجيل","دخول","حساب","باسورد","password"], a:"لتسجيل الدخول: اضغط 'تسجيل الدخول' في الأعلى، واكتب الإيميل وكلمة المرور اللي المس شيرهان عملتهملك."},
+  {q:["ميس","شيرهان","تواصل","اتصال","واتساب"], a:"للتواصل مع مس. شيرهان: اضغط على الزرار الأخضر العائم في أسفل الصفحة 💚"},
+  {q:["دفع","فيزا","فودافون","كاش"], a:"الدفع حاليًا بيتم عن طريق التواصل المباشر مع المس شيرهان على الواتساب."},
+  {q:["شهادة","شهادات"], a:"بعد إكمال الكورس، تقدر تحمّل شهادة إتمام من صفحة 'شهاداتي' 📜"},
+  {q:["اختبار","كويز","امتحان"], a:"فيه اختبارات قصيرة بعد كل فيديو عشان تتأكد إنك فهمت. اضغط على 'ابدأ الاختبار' داخل الكورس."},
+  {q:["نقاط","شارات"], a:"بتكسب نقاط لما تكمّل فيديوهات، وبتاخد شارات (متفوق، نشيط...) لما توصل لأهداف معينة 🏆"},
+];
+function openAIAssistant(){
+  const overlay = document.getElementById("ai-overlay");
+  if(!overlay) return;
+  overlay.classList.add("open");
+  const chat = document.getElementById("ai-chat");
+  if(chat && !chat.dataset.initialized){
+    chat.innerHTML = `<div class="ai-msg ai-bot">👋 أهلاً! أنا المساعد الذكي. اسألني عن الاشتراكات، الكورسات، الميس شيرهان، أو أي حاجة تانية 💛</div>`;
+    chat.dataset.initialized = "1";
+  }
+}
+function closeAIAssistant(){document.getElementById("ai-overlay").classList.remove("open");}
+function sendAIMessage(){
+  const input = document.getElementById("ai-input");
+  const chat = document.getElementById("ai-chat");
+  const text = input.value.trim();
+  if(!text) return;
+  chat.innerHTML += `<div class="ai-msg ai-user">${escapeHtml(text)}</div>`;
+  input.value = "";
+  chat.scrollTop = chat.scrollHeight;
+
+  const lower = text.toLowerCase();
+  const found = FAQ_ANSWERS.find(faq => faq.q.some(kw => lower.includes(kw)));
+  const reply = found
+    ? found.a
+    : "معلش، مش فاهم سؤالك بالظبط. ممكن تسأل عن: الاشتراكات، الكورسات، تسجيل الدخول، أو التواصل مع الميس.";
+
+  setTimeout(() => {
+    chat.innerHTML += `<div class="ai-msg ai-bot">${reply}</div>`;
+    chat.scrollTop = chat.scrollHeight;
+  }, 400);
+}
+window.openAIAssistant = openAIAssistant;
+window.closeAIAssistant = closeAIAssistant;
+window.sendAIMessage = sendAIMessage;
+
+/* ============================================================
    Home
    ============================================================ */
 async function loadHome(){
@@ -356,10 +455,56 @@ async function loadHome(){
   document.getElementById("levels-grid").innerHTML=levels.length
     ?levels.map((lv,i)=>`<div class="card level-card"><div class="lv-num">${i+1}</div><h3>${lang==="ar"?lv.name_ar:lv.name_en}</h3></div>`).join("")
     :`<div class="empty-state">لسه مفيش مراحل</div>`;
+
+  // Fill filter
+  const filterLevel = document.getElementById("filter-level");
+  if(filterLevel){
+    filterLevel.innerHTML = `<option value="">كل المراحل</option>` +
+      levels.map(lv => `<option value="${lv.id}">${lv.name_ar}</option>`).join("");
+  }
+
   document.getElementById("packages-grid").innerHTML=packages.length
     ?packages.map(p=>`<div class="card pkg-card"><h3>${lang==="ar"?p.name_ar:p.name_en}</h3><div class="price">${p.price} <small>${lang==="ar"?"ج.م / "+p.duration_days+" يوم":"EGP / "+p.duration_days+" days"}</small></div><p class="desc">${(lang==="ar"?p.description_ar:p.description_en)||""}</p><button class="btn btn-teal btn-block" onclick='subscribeViaWhatsApp(${JSON.stringify(lang==="ar"?p.name_ar:p.name_en)})'>اشترك</button></div>`).join("")
     :`<div class="empty-state">لسه مفيش باقات</div>`;
 }
+
+/* ============================================================
+   Filter Courses (advanced)
+   ============================================================ */
+function filterCourses(){
+  const q = (document.getElementById("search-input")?.value || "").toLowerCase();
+  const levelFilter = document.getElementById("filter-level")?.value || "";
+  const sortBy = document.getElementById("filter-sort")?.value || "newest";
+
+  let filtered = [...ALL_COURSES_CACHE];
+  if(q) filtered = filtered.filter(c =>
+    (c.title_ar || "").toLowerCase().includes(q) ||
+    (c.title_en || "").toLowerCase().includes(q) ||
+    (c.description_ar || "").toLowerCase().includes(q)
+  );
+  if(levelFilter) filtered = filtered.filter(c => c.grade_level_id === levelFilter);
+
+  if(sortBy === "newest") filtered.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  else if(sortBy === "oldest") filtered.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+
+  // Apply to grid if it's the home grid
+  const grid = document.getElementById("packages-grid");
+  if(grid && filtered.length){
+    const lang = localStorage.getItem("basetna_lang") || "ar";
+    grid.innerHTML = filtered.map(p=>`<div class="card pkg-card"><h3>${lang==="ar"?p.title_ar:p.title_en||p.title_ar}</h3><p class="desc">${(p.description_ar)||""}</p></div>`).join("");
+  }
+}
+window.filterCourses = filterCourses;
+
+function filterStudentCourses(){
+  const q = (document.getElementById("student-search-input")?.value || "").toLowerCase();
+  const cards = document.querySelectorAll("#courses-grid .course-card");
+  cards.forEach(card => {
+    const t = (card.querySelector("h3")?.textContent || "").toLowerCase();
+    card.style.display = t.includes(q) ? "" : "none";
+  });
+}
+window.filterStudentCourses = filterStudentCourses;
 
 /* ============================================================
    Support / Chat
@@ -513,13 +658,17 @@ function wireOwnerTabs(){
       document.querySelectorAll("#view-owner .tab-panel").forEach(p=>p.hidden=true);
       const target=document.getElementById("panel-"+link.dataset.tab);
       if(target)target.hidden=false;
-      if(link.dataset.tab==="inbox")loadAdminInbox();
-      if(link.dataset.tab==="chats")loadChatsPanel();
-      if(link.dataset.tab==="levels")loadLevels();
-      if(link.dataset.tab==="courses")loadCourses();
-      if(link.dataset.tab==="packages")loadPackages();
-      if(link.dataset.tab==="students")loadStudents();
-      if(link.dataset.tab==="stats")loadStats();
+      const tab = link.dataset.tab;
+      if(tab==="inbox")loadAdminInbox();
+      if(tab==="chats")loadChatsPanel();
+      if(tab==="levels")loadLevels();
+      if(tab==="courses")loadCourses();
+      if(tab==="packages")loadPackages();
+      if(tab==="students")loadStudents();
+      if(tab==="stats")loadStats();
+      if(tab==="analytics")loadAnalytics();
+      if(tab==="schedule")loadSchedule();
+      if(tab==="discounts")loadDiscounts();
     });
   });
 }
@@ -571,24 +720,17 @@ async function loadStats(){
   const el = document.getElementById("stats-content");
   if(!el) return;
   el.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
-
   const [levelsStats, lessonsStats, ratingsRes] = await Promise.all([
     supabaseClient.rpc("stats_students_per_level"),
     supabaseClient.rpc("stats_lessons_per_course"),
     supabaseClient.from("course_ratings").select("rating")
   ]);
-
-  if(levelsStats.error) logError("إحصائيات المراحل", levelsStats.error);
-  if(lessonsStats.error) logError("إحصائيات الدروس", lessonsStats.error);
-
   const levels = levelsStats.data || [];
   const coursesStats = lessonsStats.data || [];
   const ratings = ratingsRes.data || [];
-
   const totalStudents = levels.reduce((a, l) => a + Number(l.students_count || 0), 0);
   const totalActive = levels.reduce((a, l) => a + Number(l.active_subs || 0), 0);
-  const totalRatings = ratings.length;
-  const avgAll = totalRatings ? (ratings.reduce((a,r) => a + r.rating, 0) / totalRatings).toFixed(1) : "—";
+  const avgAll = ratings.length ? (ratings.reduce((a,r) => a + r.rating, 0) / ratings.length).toFixed(1) : "—";
 
   el.innerHTML = `
     <div class="kpi-row" style="margin-bottom:24px;">
@@ -597,58 +739,94 @@ async function loadStats(){
       <div class="kpi"><div class="num">${coursesStats.length}</div><div class="label">📚 الكورسات</div></div>
       <div class="kpi"><div class="num">${avgAll}</div><div class="label">⭐ متوسط التقييم</div></div>
     </div>
-
     <div class="card" style="margin-bottom:20px;">
-      <h3 style="color:var(--navy-deep);margin:0 0 14px;">📊 الطلاب لكل مرحلة</h3>
-      ${levels.length ? `
-        <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="background:var(--paper-2);">
-            <th style="padding:10px;text-align:start;">المرحلة</th>
-            <th style="padding:10px;text-align:start;">عدد الطلاب</th>
-            <th style="padding:10px;text-align:start;">اشتراكات فعّالة</th>
-            <th style="padding:10px;text-align:start;">النسبة</th>
-          </tr></thead>
-          <tbody>
-            ${levels.map(l => {
-              const pct = l.students_count > 0 ? Math.round((Number(l.active_subs) / Number(l.students_count)) * 100) : 0;
-              return `<tr>
-                <td style="padding:10px;border-bottom:1px solid var(--line);">${escapeHtml(l.level_name)}</td>
-                <td style="padding:10px;border-bottom:1px solid var(--line);"><b>${l.students_count}</b></td>
-                <td style="padding:10px;border-bottom:1px solid var(--line);">${l.active_subs}</td>
-                <td style="padding:10px;border-bottom:1px solid var(--line);">
-                  <div style="background:var(--paper-2);border-radius:999px;overflow:hidden;height:8px;width:100px;">
-                    <div style="background:linear-gradient(90deg,var(--teal),var(--gold));height:100%;width:${pct}%;"></div>
-                  </div>
-                  <span style="font-size:12px;color:var(--ink-soft);">${pct}%</span>
-                </td>
-              </tr>`;
-            }).join("")}
-          </tbody>
-        </table>
-      ` : `<div class="empty-state">مفيش بيانات</div>`}
+      <h3>📊 الطلاب لكل مرحلة</h3>
+      ${levels.length ? `<table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:var(--paper-2);"><th style="padding:10px;text-align:start;">المرحلة</th><th style="padding:10px;text-align:start;">الطلاب</th><th style="padding:10px;text-align:start;">اشتراكات</th></tr></thead>
+        <tbody>${levels.map(l => `<tr><td style="padding:10px;border-bottom:1px solid var(--line);">${escapeHtml(l.level_name)}</td><td style="padding:10px;border-bottom:1px solid var(--line);"><b>${l.students_count}</b></td><td style="padding:10px;border-bottom:1px solid var(--line);">${l.active_subs}</td></tr>`).join("")}</tbody>
+      </table>` : `<div class="empty-state">مفيش بيانات</div>`}
     </div>
-
     <div class="card">
-      <h3 style="color:var(--navy-deep);margin:0 0 14px;">🎬 الكورسات والفيديوهات</h3>
-      ${coursesStats.length ? `
-        <table style="width:100%;border-collapse:collapse;">
-          <thead><tr style="background:var(--paper-2);">
-            <th style="padding:10px;text-align:start;">الكورس</th>
-            <th style="padding:10px;text-align:start;">عدد الفيديوهات</th>
-            <th style="padding:10px;text-align:start;">⭐ التقييم</th>
-          </tr></thead>
-          <tbody>
-            ${coursesStats.map(c => `<tr>
-              <td style="padding:10px;border-bottom:1px solid var(--line);">${escapeHtml(c.course_title)}</td>
-              <td style="padding:10px;border-bottom:1px solid var(--line);"><b>${c.lessons_count}</b></td>
-              <td style="padding:10px;border-bottom:1px solid var(--line);">${c.avg_rating} ⭐</td>
-            </tr>`).join("")}
-          </tbody>
-        </table>
-      ` : `<div class="empty-state">مفيش كورسات لسه</div>`}
+      <h3>🎬 الكورسات والفيديوهات</h3>
+      ${coursesStats.length ? `<table style="width:100%;border-collapse:collapse;">
+        <thead><tr style="background:var(--paper-2);"><th style="padding:10px;text-align:start;">الكورس</th><th style="padding:10px;text-align:start;">الفيديوهات</th><th style="padding:10px;text-align:start;">⭐</th></tr></thead>
+        <tbody>${coursesStats.map(c => `<tr><td style="padding:10px;border-bottom:1px solid var(--line);">${escapeHtml(c.course_title)}</td><td style="padding:10px;border-bottom:1px solid var(--line);"><b>${c.lessons_count}</b></td><td style="padding:10px;border-bottom:1px solid var(--line);">${c.avg_rating}</td></tr>`).join("")}</tbody>
+      </table>` : `<div class="empty-state">مفيش كورسات</div>`}
     </div>`;
 }
 window.loadStats = loadStats;
+
+/* ============================================================
+   Advanced Analytics (#20)
+   ============================================================ */
+async function loadAnalytics(){
+  const el = document.getElementById("analytics-content");
+  if(!el) return;
+  el.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
+
+  // نمو الطلاب شهريًا
+  const { data: profiles } = await supabaseClient.from("profiles").select("created_at, role").eq("role","student");
+  const monthlyGrowth = {};
+  (profiles||[]).forEach(p => {
+    const month = new Date(p.created_at).toLocaleString("ar-EG",{month:"long",year:"numeric"});
+    monthlyGrowth[month] = (monthlyGrowth[month]||0) + 1;
+  });
+
+  const { data: ratings } = await supabaseClient.from("course_ratings").select("rating");
+  const { data: courses } = await supabaseClient.from("courses").select("id, title_ar");
+  const { data: lessons } = await supabaseClient.from("lessons").select("course_id");
+  const { data: progress } = await supabaseClient.from("lesson_progress").select("lesson_id, watched").eq("watched", true);
+
+  // أكثر كورس شعبية (حسب عدد الفيديوهات)
+  const coursePopularity = {};
+  (lessons||[]).forEach(l => { coursePopularity[l.course_id] = (coursePopularity[l.course_id]||0) + 1; });
+  const topCourses = (courses||[]).map(c => ({...c, lessons: coursePopularity[c.id]||0}))
+    .sort((a,b) => b.lessons - a.lessons).slice(0, 5);
+
+  // معدل إتمام الفيديوهات
+  const totalLessons = (lessons||[]).length;
+  const totalWatched = (progress||[]).length;
+  const completionRate = totalLessons ? Math.round((totalWatched / totalLessons) * 100) : 0;
+
+  // الرسم البياني (Simple bar chart)
+  const maxGrowth = Math.max(...Object.values(monthlyGrowth), 1);
+
+  el.innerHTML = `
+    <div class="kpi-row" style="margin-bottom:24px;">
+      <div class="kpi"><div class="num">${(profiles||[]).length}</div><div class="label">👥 إجمالي الطلاب</div></div>
+      <div class="kpi"><div class="num">${totalLessons}</div><div class="label">🎬 إجمالي الفيديوهات</div></div>
+      <div class="kpi"><div class="num">${totalWatched}</div><div class="label">✅ فيديوهات تمت مشاهدتها</div></div>
+      <div class="kpi"><div class="num">${completionRate}%</div><div class="label">📊 معدل الإتمام</div></div>
+    </div>
+
+    <div class="card" style="margin-bottom:20px;">
+      <h3 style="color:var(--navy-deep);margin:0 0 14px;">📈 نمو الطلاب شهريًا</h3>
+      <div style="display:flex;gap:8px;align-items:flex-end;height:200px;padding:20px;background:var(--paper);border-radius:12px;">
+        ${Object.entries(monthlyGrowth).map(([month, count]) => `
+          <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;">
+            <div style="width:100%;background:linear-gradient(180deg,var(--gold),var(--teal));border-radius:6px 6px 0 0;height:${(count/maxGrowth)*150}px;min-height:10px;position:relative;">
+              <span style="position:absolute;top:-20px;inset-inline-start:50%;transform:translateX(-50%);font-size:12px;font-weight:800;color:var(--navy-deep);">${count}</span>
+            </div>
+            <div style="font-size:10.5px;color:var(--ink-soft);text-align:center;line-height:1.2;">${month}</div>
+          </div>
+        `).join("") || `<div class="empty-state">مفيش بيانات</div>`}
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="color:var(--navy-deep);margin:0 0 14px;">🏆 أكثر الكورسات شعبية</h3>
+      ${topCourses.length ? topCourses.map((c, i) => `
+        <div style="display:flex;gap:12px;align-items:center;padding:10px;background:var(--paper);border-radius:8px;margin-bottom:8px;">
+          <div style="font-size:24px;">${["🥇","🥈","🥉","4️⃣","5️⃣"][i]}</div>
+          <div style="flex:1;">
+            <b style="color:var(--navy-deep);">${escapeHtml(c.title_ar)}</b>
+            <div style="font-size:12px;color:var(--ink-soft);">${c.lessons} فيديو</div>
+          </div>
+        </div>
+      `).join("") : `<div class="empty-state">مفيش بيانات</div>`}
+    </div>`;
+}
+window.loadAnalytics = loadAnalytics;
 
 /* ============================================================
    Levels
@@ -684,10 +862,8 @@ async function loadCourses(){
   const {data,error}=await supabaseClient.from("courses").select("*, grade_levels(name_ar)").order("sort_order");
   if(error){logError("تحميل الكورسات",error);return;}
   ALL_COURSES_CACHE = data || [];
-
   const courseIds = (data || []).map(c => c.id);
-  let lessonsCount = {};
-  let ratingsAvg = {};
+  let lessonsCount = {}, ratingsAvg = {};
   if(courseIds.length){
     const { data: lessonsData } = await supabaseClient.from("lessons").select("course_id").in("course_id", courseIds);
     (lessonsData||[]).forEach(l => { lessonsCount[l.course_id] = (lessonsCount[l.course_id]||0)+1; });
@@ -700,7 +876,6 @@ async function loadCourses(){
     });
     Object.keys(totals).forEach(k => { ratingsAvg[k] = (totals[k].sum / totals[k].count).toFixed(1); });
   }
-
   document.getElementById("courses-table").innerHTML=(data&&data.length)
     ?data.map(c=>`<tr>
         <td><b>${escapeHtml(c.title_ar)}</b></td>
@@ -710,6 +885,7 @@ async function loadCourses(){
         <td>
           <button class="icon-btn" onclick='openLessonsManager("${c.id}","${escapeHtml(c.title_ar).replace(/'/g,"&#39;")}")'>🎬 الفيديوهات</button>
           <button class="icon-btn" onclick='openCourseForm(${JSON.stringify(c).replace(/'/g,"&#39;")})'>✏️</button>
+          <button class="icon-btn" onclick='openCommentsModal("${c.id}","${escapeHtml(c.title_ar).replace(/'/g,"&#39;")}")'>💬</button>
           <button class="icon-btn danger" onclick="deleteRow('courses','${c.id}', loadCourses)">🗑️</button>
         </td>
       </tr>`).join("")
@@ -736,10 +912,7 @@ function openCourseForm(course){
           <option value="link" ${course?.content_type==="link"?"selected":""}>🎬 كورس فيديوهات</option>
           <option value="file" ${course?.content_type==="file"?"selected":""}>📄 ملف</option>
         </select></div>
-      <div class="field" id="cr-link-field">
-        <label>رابط الفيديو التقديمي (اختياري)</label>
-        <input type="url" id="cr-link" value="${course?.content_type==="link"?course.content_url:""}" placeholder="https://youtu.be/...">
-      </div>
+      <div class="field" id="cr-link-field"><label>رابط الفيديو التقديمي (اختياري)</label><input type="url" id="cr-link" value="${course?.content_type==="link"?course.content_url:""}"></div>
       <button class="btn btn-gold btn-block" type="submit">حفظ</button>
       <div class="form-msg" id="course-msg"></div>
     </form>`;
@@ -747,10 +920,9 @@ function openCourseForm(course){
   document.getElementById("course-form").addEventListener("submit",async(e)=>{
     e.preventDefault();
     const msg=document.getElementById("course-msg");
-    const type=document.getElementById("cr-type").value;
     let contentUrl=document.getElementById("cr-link").value.trim();
     if(!contentUrl){ contentUrl = "https://placeholder.com"; }
-    const payload={title_ar:document.getElementById("cr-title-ar").value.trim(),title_en:document.getElementById("cr-title-en").value.trim(),grade_level_id:document.getElementById("cr-level").value,description_ar:document.getElementById("cr-desc-ar").value.trim(),content_type:type,content_url:contentUrl};
+    const payload={title_ar:document.getElementById("cr-title-ar").value.trim(),title_en:document.getElementById("cr-title-en").value.trim(),grade_level_id:document.getElementById("cr-level").value,description_ar:document.getElementById("cr-desc-ar").value.trim(),content_type:document.getElementById("cr-type").value,content_url:contentUrl};
     const q=course?supabaseClient.from("courses").update(payload).eq("id",course.id):supabaseClient.from("courses").insert(payload);
     const {error}=await q;
     if(error){showMsg(msg,friendlyError(error),"error");return;}
@@ -767,8 +939,7 @@ async function openLessonsManager(courseId, courseTitle){
   document.getElementById("form-modal-content").innerHTML = `
     <button class="close" onclick="closeFormModal()">✕</button>
     <h3>🎬 فيديوهات: ${escapeHtml(courseTitle)}</h3>
-    <button class="btn btn-gold btn-block" style="margin-bottom:16px; padding:14px; font-size:15px;"
-            onclick='openLessonForm("${courseId}")'>
+    <button class="btn btn-gold btn-block" style="margin-bottom:16px; padding:14px; font-size:15px;" onclick='openLessonForm("${courseId}")'>
       ➕ إضافة فيديو جديد للسلسلة
     </button>
     <div style="max-height:60vh;overflow-y:auto;">
@@ -792,8 +963,8 @@ function openLessonForm(courseId){
     <button class="close" onclick="closeFormModal()">✕</button>
     <h3>🎬 إضافة فيديو جديد</h3>
     <form id="lesson-form">
-      <div class="field"><label>عنوان الفيديو (عربي)</label><input type="text" id="ls-title" required placeholder="مثال: الشرح - الدرس الأول"></div>
-      <div class="field"><label>وصف مختصر</label><textarea id="ls-desc" rows="2" placeholder="وصف مختصر للفيديو..."></textarea></div>
+      <div class="field"><label>عنوان الفيديو (عربي)</label><input type="text" id="ls-title" required></div>
+      <div class="field"><label>وصف مختصر</label><textarea id="ls-desc" rows="2"></textarea></div>
       <div class="field"><label>نوع الفيديو</label>
         <select id="ls-type">
           <option value="youtube">▶️ يوتيوب</option>
@@ -804,18 +975,15 @@ function openLessonForm(courseId){
       <div class="field" id="ls-url-field">
         <label id="ls-url-label">رابط الفيديو على يوتيوب</label>
         <input type="url" id="ls-url" placeholder="https://youtu.be/xxxxxxxxxxx">
-        <small style="display:block;margin-top:6px;color:var(--ink-soft);font-size:12px;" id="ls-url-hint">
-          الصق رابط الفيديو — الموقع هيشغّله داخل صفحة الكورس تلقائيًا
-        </small>
       </div>
       <div class="field" id="ls-file-field" hidden>
-        <label>🎬 اختار ملف الفيديو من جهازك</label>
+        <label>🎬 اختار ملف الفيديو</label>
         <input type="file" id="ls-file" accept="video/*">
         <div id="ls-file-preview" style="margin-top:10px;"></div>
       </div>
-      <div class="field"><label>المدة (بالدقايق) — اختياري</label><input type="number" id="ls-duration" value="0" min="0"></div>
-      <div class="field"><label>الترتيب في السلسلة</label><input type="number" id="ls-order" value="0"></div>
-      <button class="btn btn-gold btn-block" type="submit">💾 حفظ الفيديو</button>
+      <div class="field"><label>المدة (دقايق)</label><input type="number" id="ls-duration" value="0" min="0"></div>
+      <div class="field"><label>الترتيب</label><input type="number" id="ls-order" value="0"></div>
+      <button class="btn btn-gold btn-block" type="submit">💾 حفظ</button>
       <div class="form-msg" id="ls-msg"></div>
     </form>`;
 
@@ -823,16 +991,15 @@ function openLessonForm(courseId){
   const urlField = document.getElementById("ls-url-field");
   const fileField = document.getElementById("ls-file-field");
   const urlLabel = document.getElementById("ls-url-label");
-  const urlHint  = document.getElementById("ls-url-hint");
   const urlInput = document.getElementById("ls-url");
 
   const toggleType = () => {
     const t = typeSel.value;
     fileField.hidden = (t !== "file");
     urlField.hidden  = (t === "file");
-    if(t === "youtube"){ urlLabel.textContent = "رابط الفيديو على يوتيوب"; urlHint.textContent = "الصق رابط يوتيوب"; urlInput.placeholder = "https://youtu.be/xxxxxxxxxxx"; }
-    else if(t === "vimeo"){ urlLabel.textContent = "رابط الفيديو على فيميو"; urlHint.textContent = "الصق رابط فيميو"; urlInput.placeholder = "https://vimeo.com/123456789"; }
-    else if(t === "drive"){ urlLabel.textContent = "رابط الملف على جوجل درايف"; urlHint.textContent = "الصق رابط المشاركة"; urlInput.placeholder = "https://drive.google.com/file/d/xxxxx/view"; }
+    if(t === "youtube"){ urlLabel.textContent = "رابط الفيديو على يوتيوب"; urlInput.placeholder = "https://youtu.be/xxxxxxxxxxx"; }
+    else if(t === "vimeo"){ urlLabel.textContent = "رابط الفيديو على فيميو"; urlInput.placeholder = "https://vimeo.com/123456789"; }
+    else if(t === "drive"){ urlLabel.textContent = "رابط الملف على جوجل درايف"; urlInput.placeholder = "https://drive.google.com/file/d/xxxxx/view"; }
   };
   typeSel.addEventListener("change", toggleType); toggleType();
 
@@ -840,8 +1007,7 @@ function openLessonForm(courseId){
     const file = e.target.files[0];
     const preview = document.getElementById("ls-file-preview");
     if(!file){ preview.innerHTML = ""; return; }
-    const size = (file.size / 1024 / 1024).toFixed(1);
-    preview.innerHTML = `<video src="${URL.createObjectURL(file)}" controls style="max-width:100%;border-radius:10px;max-height:180px;"></video><div style="font-size:12px;color:var(--ink-soft);margin-top:6px;">📹 ${file.name} (${size} MB)</div>`;
+    preview.innerHTML = `<video src="${URL.createObjectURL(file)}" controls style="max-width:100%;border-radius:10px;max-height:180px;"></video><div style="font-size:12px;margin-top:6px;">📹 ${file.name}</div>`;
   });
 
   document.getElementById("lesson-form").addEventListener("submit", async (e) => {
@@ -852,8 +1018,8 @@ function openLessonForm(courseId){
 
     if(type === "file"){
       const file = document.getElementById("ls-file").files[0];
-      if(!file){ showMsg(msg, "⚠️ اختار ملف فيديو", "error"); return; }
-      showMsg(msg, "⏳ جاري رفع الفيديو...", "ok");
+      if(!file){ showMsg(msg, "⚠️ اختار ملف", "error"); return; }
+      showMsg(msg, "⏳ جاري الرفع...", "ok");
       const path = `lessons/${Date.now()}_${file.name}`;
       const { error: upErr } = await supabaseClient.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: file.type, upsert: false });
       if(upErr){ showMsg(msg, "❌ فشل الرفع: " + friendlyError(upErr), "error"); return; }
@@ -890,18 +1056,26 @@ async function deleteLesson(id, courseId, courseTitle){
 window.deleteLesson = deleteLesson;
 
 /* ============================================================
-   Course Player
+   Course Player + Progress
    ============================================================ */
 async function openCoursePlayer(courseId, courseTitle){
-  const [courseRes, lessonsRes, ratingRes] = await Promise.all([
+  const [courseRes, lessonsRes, ratingRes, progressRes, myRatingRes] = await Promise.all([
     supabaseClient.from("courses").select("*").eq("id", courseId).single(),
     supabaseClient.from("lessons").select("*").eq("course_id", courseId).order("sort_order"),
-    supabaseClient.rpc("course_rating_stats", { course_uuid: courseId })
+    supabaseClient.rpc("course_rating_stats", { course_uuid: courseId }),
+    supabaseClient.from("lesson_progress").select("lesson_id, watched").eq("student_id", CURRENT_PROFILE.id).eq("watched", true),
+    supabaseClient.from("course_ratings").select("*").eq("course_id", courseId).eq("student_id", CURRENT_PROFILE.id).maybeSingle()
   ]);
   if(courseRes.error){ logError("جلب الكورس", courseRes.error); return; }
   const lessons = lessonsRes.data || [];
   const rating = ratingRes.data?.[0] || { avg_rating: 0, total_ratings: 0 };
-  const { data: myRating } = await supabaseClient.from("course_ratings").select("*").eq("course_id", courseId).eq("student_id", CURRENT_PROFILE.id).maybeSingle();
+  const myRating = myRatingRes.data;
+
+  // Progress
+  LESSONS_PROGRESS = {};
+  (progressRes.data||[]).forEach(p => { LESSONS_PROGRESS[p.lesson_id] = true; });
+  const watchedCount = lessons.filter(l => LESSONS_PROGRESS[l.id]).length;
+  const progressPct = lessons.length ? Math.round((watchedCount / lessons.length) * 100) : 0;
 
   document.getElementById("course-player-body").innerHTML = `
     <div class="course-player-head">
@@ -910,14 +1084,18 @@ async function openCoursePlayer(courseId, courseTitle){
         <span>⭐ ${rating.avg_rating} (${rating.total_ratings} تقييم)</span>
         <span>📹 ${lessons.length} فيديو</span>
       </div>
+      <div class="progress-bar" style="margin-top:12px;">
+        <div class="progress-fill" style="width:${progressPct}%;"></div>
+      </div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:6px;">📊 ${progressPct}% مكتمل (${watchedCount}/${lessons.length})</div>
     </div>
     <div class="lessons-list">
       ${lessons.length ? lessons.map((l, i) => `
-        <div class="lesson-item" onclick='playLesson(${JSON.stringify(l).replace(/'/g,"&#39;")})'>
+        <div class="lesson-item ${LESSONS_PROGRESS[l.id] ? 'watched' : ''}" onclick='playLesson(${JSON.stringify(l).replace(/'/g,"&#39;")})'>
           <div class="lesson-thumb">
             ${l.thumbnail_url ? `<img src="${l.thumbnail_url}">` : getVideoThumbnail(l.video_type, l.video_url) ? `<img src="${getVideoThumbnail(l.video_type, l.video_url)}">` : `<div class="lesson-placeholder">🎬</div>`}
             <div class="lesson-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
-            <span class="lesson-num">${i+1}</span>
+            <span class="lesson-num">${LESSONS_PROGRESS[l.id] ? "✓" : i+1}</span>
           </div>
           <div class="lesson-info">
             <h4>${escapeHtml(l.title_ar)}</h4>
@@ -933,6 +1111,8 @@ async function openCoursePlayer(courseId, courseTitle){
         ${[1,2,3,4,5].map(n => `<span class="star ${myRating && myRating.rating >= n ? "active" : ""}" onclick="submitRating('${courseId}', ${n})">★</span>`).join("")}
       </div>
       ${myRating ? `<p class="rating-thanks">شكراً لتقييمك 💛</p>` : ""}
+      <button class="btn btn-teal btn-block" style="margin-top:14px;" onclick='openCommentsModal("${courseId}","${escapeHtml(courseTitle).replace(/'/g,"&#39;")}")'>💬 شوف التعليقات</button>
+      <button class="btn btn-gold btn-block" style="margin-top:8px;" onclick='openCertificate("${courseId}")'>📜 احصل على شهادة</button>
     </div>`;
   document.getElementById("course-player-overlay").classList.add("open");
 }
@@ -957,14 +1137,21 @@ function playLesson(lesson){
     html = `<video src="${lesson.video_url}" controls autoplay style="width:100%;height:100%;"></video>`;
   }
   if(!html){
-    player.innerHTML = `<div style="color:#fff;padding:20px;text-align:center;"><p>⚠️ الرابط غلط</p><a href="${lesson.video_url}" target="_blank" style="color:var(--gold-soft);">افتح الرابط خارج الموقع</a></div>`;
+    player.innerHTML = `<div style="color:#fff;padding:20px;text-align:center;"><p>⚠️ الرابط غلط</p></div>`;
   } else {
     player.innerHTML = html;
   }
   placeholder.style.display = "none";
   player.style.display = "block";
+
+  // تسجيل المشاهدة + النقاط
   if(CURRENT_PROFILE){
-    supabaseClient.from("lesson_progress").upsert({lesson_id: lesson.id, student_id: CURRENT_PROFILE.id, watched: true},{onConflict:"lesson_id,student_id"}).then(()=>{});
+    supabaseClient.from("lesson_progress").upsert({
+      lesson_id: lesson.id, student_id: CURRENT_PROFILE.id, watched: true
+    }, {onConflict:"lesson_id,student_id"}).then(() => {
+      // إضافة نقاط
+      supabaseClient.rpc("add_points", {student_uuid: CURRENT_PROFILE.id, points: 10}).then(()=>{});
+    });
   }
 }
 window.playLesson = playLesson;
@@ -984,6 +1171,146 @@ function closeCoursePlayer(){
   if(player) player.innerHTML = "";
 }
 window.closeCoursePlayer = closeCoursePlayer;
+
+/* ============================================================
+   Comments (#5)
+   ============================================================ */
+async function openCommentsModal(courseId, courseTitle){
+  document.getElementById("comments-title").textContent = "💬 تعليقات: " + courseTitle;
+  document.getElementById("comments-overlay").dataset.courseId = courseId;
+  document.getElementById("comments-overlay").classList.add("open");
+  await loadComments(courseId);
+}
+async function loadComments(courseId){
+  const list = document.getElementById("comments-list");
+  list.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
+  const { data, error } = await supabaseClient.from("comments")
+    .select("*, profiles(full_name, role)").eq("course_id", courseId)
+    .order("created_at", {ascending: false});
+  if(error){
+    list.innerHTML = `<div class="empty-state">⚠️ ميزة التعليقات لسه مش مفعّلة</div>`;
+    return;
+  }
+  if(!data?.length){
+    list.innerHTML = `<div class="empty-state">لسه مفيش تعليقات</div>`;
+    return;
+  }
+  list.innerHTML = data.map(c => `
+    <div style="background:var(--paper);padding:12px;border-radius:10px;margin-bottom:8px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <b style="color:var(--navy-deep);">${escapeHtml(c.profiles?.full_name || "طالب")}</b>
+        <span class="role-tag">${c.profiles?.role || "student"}</span>
+      </div>
+      <p style="margin:0;font-size:14px;">${escapeHtml(c.content)}</p>
+    </div>`).join("");
+}
+async function submitComment(){
+  const overlay = document.getElementById("comments-overlay");
+  const courseId = overlay.dataset.courseId;
+  const input = document.getElementById("comment-input");
+  const content = input.value.trim();
+  if(!content) return;
+  const { error } = await supabaseClient.from("comments").insert({
+    course_id: courseId,
+    student_id: CURRENT_PROFILE.id,
+    content
+  });
+  if(error){ logError("نشر التعليق", error); return; }
+  input.value = "";
+  await loadComments(courseId);
+  showToast("✅ تم نشر تعليقك", "ok", 2000);
+}
+function closeComments(){document.getElementById("comments-overlay").classList.remove("open");}
+window.openCommentsModal = openCommentsModal;
+window.closeComments = closeComments;
+window.submitComment = submitComment;
+
+/* ============================================================
+   Certificate (#12)
+   ============================================================ */
+async function openCertificate(courseId){
+  document.getElementById("cert-overlay").classList.add("open");
+  const body = document.getElementById("cert-body");
+  const { data: course } = await supabaseClient.from("courses").select("*").eq("id", courseId).single();
+  const { data: lessons } = await supabaseClient.from("lessons").select("id").eq("course_id", courseId);
+  const { data: progress } = await supabaseClient.from("lesson_progress")
+    .select("lesson_id").eq("student_id", CURRENT_PROFILE.id).eq("watched", true);
+
+  const total = lessons?.length || 0;
+  const watched = progress?.filter(p => lessons?.some(l => l.id === p.lesson_id)).length || 0;
+  const pct = total ? Math.round((watched/total)*100) : 0;
+
+  if(pct < 80){
+    body.innerHTML = `
+      <h3 style="text-align:center;">📜 شهادة الإتمام</h3>
+      <div class="empty-state" style="padding:40px 20px;">
+        <div style="font-size:48px;margin-bottom:12px;">⚠️</div>
+        <p>لازم تكمّل 80% على الأقل من الكورس (${watched}/${total})</p>
+        <button class="btn btn-teal" onclick="closeCertificate()">موافق</button>
+      </div>`;
+    return;
+  }
+
+  body.innerHTML = `
+    <div style="background:linear-gradient(135deg,#FAF6EE,#F1EADC);padding:40px;border:6px double var(--gold);border-radius:16px;text-align:center;">
+      <div style="font-size:60px;">🏆</div>
+      <h2 style="color:var(--navy-deep);margin:12px 0 6px;">شهادة إتمام</h2>
+      <p style="color:var(--ink-soft);font-size:14px;">تشهد منصة بسّطنا الإنجليزي بأن</p>
+      <h3 style="color:var(--navy-deep);font-size:24px;margin:14px 0;font-weight:800;">${escapeHtml(CURRENT_PROFILE.full_name)}</h3>
+      <p style="color:var(--ink-soft);font-size:14px;">قد أكمل بنجاح كورس</p>
+      <h3 style="color:var(--teal);font-size:20px;margin:10px 0;">${escapeHtml(course?.title_ar || "")}</h3>
+      <p style="color:var(--ink-soft);font-size:13px;margin-top:20px;">بإشراف: مس. شيرهان علي</p>
+      <p style="color:var(--ink-soft);font-size:12px;">${new Date().toLocaleDateString("ar-EG")}</p>
+      <button class="btn btn-gold" style="margin-top:20px;" onclick="window.print()">🖨️ اطبع الشهادة</button>
+    </div>`;
+}
+function closeCertificate(){document.getElementById("cert-overlay").classList.remove("open");}
+window.openCertificate = openCertificate;
+window.closeCertificate = closeCertificate;
+
+/* ============================================================
+   Student: Points, Library, Certificates, Tasks, Schedule
+   ============================================================ */
+async function openMyPoints(e){
+  if(e) e.preventDefault();
+  const { data } = await supabaseClient.from("student_points").select("*").eq("student_id", CURRENT_PROFILE.id).maybeSingle();
+  const points = data?.points || 0;
+  const badges = data?.badges || [];
+  document.getElementById("form-modal-content").innerHTML = `
+    <button class="close" onclick="closeFormModal()">✕</button>
+    <h3>🏆 نقاطي وشاراتي</h3>
+    <div style="text-align:center;padding:20px;">
+      <div style="font-size:56px;">${points >= 500 ? "👑" : points >= 200 ? "🌟" : points >= 50 ? "⭐" : "🎯"}</div>
+      <h2 style="color:var(--navy-deep);font-size:36px;margin:10px 0;">${points}</h2>
+      <p style="color:var(--ink-soft);">نقطة</p>
+    </div>`;
+  document.getElementById("form-overlay").classList.add("open");
+}
+window.openMyPoints = openMyPoints;
+
+function openMyLibrary(e){
+  if(e) e.preventDefault();
+  showToast("📚 مكتبة الملفات — قريبًا", "info", 3000);
+}
+window.openMyLibrary = openMyLibrary;
+
+function openMyCertificates(e){
+  if(e) e.preventDefault();
+  showToast("📜 الشهادات متاحة بعد إكمال 80% من أي كورس", "info", 4000);
+}
+window.openMyCertificates = openMyCertificates;
+
+function openMyTasks(e){
+  if(e) e.preventDefault();
+  showToast("🎯 قائمة المهام — قريبًا", "info", 3000);
+}
+window.openMyTasks = openMyTasks;
+
+function openMySchedule(e){
+  if(e) e.preventDefault();
+  showToast("📅 جدول الحصص — قريبًا", "info", 3000);
+}
+window.openMySchedule = openMySchedule;
 
 /* ============================================================
    Packages
@@ -1086,6 +1413,20 @@ function openSubscriptionForm(studentId,studentName){
 }
 
 /* ============================================================
+   Schedule & Discounts (simple stubs)
+   ============================================================ */
+async function loadSchedule(){
+  const list = document.getElementById("schedule-list");
+  if(!list) return;
+  list.innerHTML = `<div class="empty-state">ميزة جدول الحصص قريبًا 📅</div>`;
+}
+async function loadDiscounts(){
+  const tbody = document.getElementById("discounts-table");
+  if(!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">ميزة أكواد الخصم قريبًا 🎁</div></td></tr>`;
+}
+
+/* ============================================================
    Settings
    ============================================================ */
 async function loadOwnerSettings(){
@@ -1118,36 +1459,12 @@ async function deleteRow(table,id,refreshFn){
 }
 
 /* ============================================================
-   Search
-   ============================================================ */
-function filterCourses(){
-  const q = (document.getElementById("search-input")?.value || "").toLowerCase();
-  const cards = document.querySelectorAll("#packages-grid .course-card, #levels-grid .course-card");
-  cards.forEach(card => {
-    const t = (card.querySelector("h3")?.textContent || "").toLowerCase();
-    card.style.display = t.includes(q) ? "" : "none";
-  });
-}
-window.filterCourses = filterCourses;
-
-function filterStudentCourses(){
-  const q = (document.getElementById("student-search-input")?.value || "").toLowerCase();
-  const cards = document.querySelectorAll("#courses-grid .course-card");
-  cards.forEach(card => {
-    const t = (card.querySelector("h3")?.textContent || "").toLowerCase();
-    card.style.display = t.includes(q) ? "" : "none";
-  });
-}
-window.filterStudentCourses = filterStudentCourses;
-
-/* ============================================================
    Course Card for Students
    ============================================================ */
 function buildCourseCard(course, lang){
   const title = lang === "ar" ? course.title_ar : (course.title_en || course.title_ar);
   const desc  = lang === "ar" ? (course.description_ar || "") : (course.description_en || "");
   const video = getVideoInfo(course);
-
   let thumbHTML = "";
   if (video?.kind === "youtube"){ thumbHTML = `<img src="${video.thumbnail}" alt="${title}" loading="lazy">`; }
   else if (video?.kind === "drive"){ thumbHTML = `<img src="${video.thumbnail}" alt="${title}" loading="lazy">`; }
@@ -1165,6 +1482,7 @@ function buildCourseCard(course, lang){
         <h3>${title}</h3>
         <p>${desc}</p>
         <button class="btn btn-teal btn-block" onclick='openCoursePlayer("${course.id}", ${JSON.stringify(title)})'>🎬 مشاهدة الكورس</button>
+        <button class="btn btn-ghost btn-block btn-sm" style="margin-top:6px;" onclick='openCommentsModal("${course.id}", ${JSON.stringify(title)})'>💬 التعليقات</button>
       </div>
     </div>`;
 }
@@ -1178,6 +1496,11 @@ async function loadStudentDashboard(profile){
   const greetWord = isFemale ? "عزيزة" : "عزيز";
   const greetEmoji = isFemale ? "👸" : "🤵";
   document.getElementById("welcome-msg").textContent = `${greetEmoji} أهلاً بيك${isFemale ? "ِ" : ""} يا ${greetWord} ${profile.full_name}`;
+
+  // Points
+  const { data: pts } = await supabaseClient.from("student_points").select("*").eq("student_id", profile.id).maybeSingle();
+  const pointsEl = document.getElementById("student-points");
+  if(pointsEl) pointsEl.textContent = pts?.points || 0;
 
   const subsRes=await supabaseClient.from("subscriptions").select("*").eq("student_id",profile.id).order("created_at",{ascending:false}).limit(1);
   const latestSub=subsRes.data?.[0];
@@ -1206,7 +1529,6 @@ async function loadStudentDashboard(profile){
    Init
    ============================================================ */
 async function initApp(){
-  // عرض مودال الترحيب لو أول مرة
   showWelcomeModalIfNeeded();
 
   const {data:{session},error:sessErr}=await supabaseClient.auth.getSession();
@@ -1217,6 +1539,11 @@ async function initApp(){
   if(profRes.error){logError("تحميل البروفايل",profRes.error);showView("public");await loadHome();await wireWhatsAppButton();return;}
   if(!profRes.data){showToast("⚠️ مفيش بروفايل","error",8000);showView("public");await loadHome();await wireWhatsAppButton();return;}
   CURRENT_PROFILE=profRes.data;
+
+  if(CURRENT_PROFILE.gender && !USER_GENDER){
+    USER_GENDER = CURRENT_PROFILE.gender;
+    try { localStorage.setItem("basetna_gender", USER_GENDER); } catch(e){}
+  }
 
   const isYassen = CURRENT_PROFILE.full_name && (CURRENT_PROFILE.full_name.includes("Yassen") || CURRENT_PROFILE.full_name.includes("ياسين"));
 

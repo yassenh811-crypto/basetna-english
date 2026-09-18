@@ -1,9 +1,8 @@
 /* ============================================================
-   بسّطنا الإنجليزي — app.js v13
-   - ياسين superadmin (أعلى من الميس)
+   بسّطنا الإنجليزي — app.js v14
+   - ياسين superadmin
+   - إصلاح ظهور الرسايل للدعم
    - رفع فيديو من الموبايل
-   - شات + دعم + محادثة خاصة
-   - حماية localStorage
    ============================================================ */
 (function(){
   function makeMem(){
@@ -31,7 +30,6 @@ let CURRENT_LEVELS = [];
 let CURRENT_PROFILE = null;
 let ALL_CONTACTS = [];
 
-/* Toast */
 function ensureToastEl(){let el=document.getElementById("global-toast");if(!el){el=document.createElement("div");el.id="global-toast";el.className="global-toast";document.body.appendChild(el);}return el;}
 function showToast(msg,type="error",duration=6000){const el=ensureToastEl();el.className="global-toast show "+type;el.textContent=msg;clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>el.classList.remove("show"),duration);}
 function friendlyError(err){
@@ -82,7 +80,6 @@ function splitFullPhone(full){
   return{dial:"20",local:c};
 }
 
-/* Language */
 function applyLanguage(lang){
   document.documentElement.lang=lang;
   document.documentElement.dir=lang==="ar"?"rtl":"ltr";
@@ -103,7 +100,6 @@ function showView(view){
 function hideSupportFabsForRole(){}
 function showMsg(el,text,type){el.textContent=text;el.className="form-msg "+type;}
 
-/* Auth */
 async function handleLogin(e){
   e.preventDefault();
   const msg=document.getElementById("login-msg");
@@ -141,7 +137,6 @@ async function logout(e){
 }
 window.logout=logout;
 
-/* WhatsApp */
 async function getWhatsAppNumber(){
   const {data,error}=await supabaseClient.from("settings").select("whatsapp_number").eq("id",1).maybeSingle();
   if(error){logError("جلب رقم الواتساب",error);return null;}
@@ -160,7 +155,6 @@ async function subscribeViaWhatsApp(packageName){
   window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`,"_blank");
 }
 
-/* Home */
 async function loadHome(){
   const lang=localStorage.getItem("basetna_lang")||"ar";
   const levelsRes=await supabaseClient.from("grade_levels").select("*").order("sort_order");
@@ -183,7 +177,9 @@ async function loadHome(){
     :`<div class="empty-state">${lang==="ar"?"لسه مفيش باقات":"No packages yet"}</div>`;
 }
 
-/* Support */
+/* ============================================================
+   الدعم الفني + المحادثات
+   ============================================================ */
 function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 async function openSupportPanel(recipientRole="support"){
@@ -209,17 +205,40 @@ async function openSupportPanel(recipientRole="support"){
 }
 function closeSupportPanel(){document.getElementById("support-overlay").classList.remove("open");}
 
+/* ============================================================
+   ⭐ إصلاح: تحميل الرسايل للأدمن (كل الرسايل)
+   ============================================================ */
 async function loadMessages(recipientRole){
-  const list=document.getElementById("support-messages");
-  const lang=localStorage.getItem("basetna_lang")||"ar";
-  list.innerHTML=`<div class="empty-state">${lang==="en"?"Loading...":"جاري التحميل..."}</div>`;
-  let query=supabaseClient.from("messages").select("*").order("created_at",{ascending:true}).limit(200);
-  if(recipientRole==="general"){query=query.eq("recipient_role","general");}
-  else{query=query.or(`and(sender_id.eq.${CURRENT_PROFILE.id},recipient_role.eq.${recipientRole}),and(recipient_role.eq.${recipientRole},sender_role.eq.${recipientRole})`);}
-  const {data,error}=await query;
-  if(error){logError("تحميل الرسائل",error);return;}
-  if(!data||!data.length){list.innerHTML=`<div class="empty-state">${lang==="en"?"No messages yet 👋":"لسه مفيش رسائل 👋"}</div>`;return;}
-  renderMessages(data,recipientRole);
+  const list = document.getElementById("support-messages");
+  const lang = localStorage.getItem("basetna_lang") || "ar";
+  list.innerHTML = `<div class="empty-state">${lang === "en" ? "Loading..." : "جاري التحميل..."}</div>`;
+
+  let query = supabaseClient.from("messages").select("*").order("created_at", { ascending: true }).limit(500);
+
+  const isAdmin = ADMIN_ROLES.includes(CURRENT_PROFILE.role);
+
+  if (recipientRole === "general"){
+    // الغرفة العامة: كل الرسايل العامة
+    query = query.eq("recipient_role", "general");
+  } else if (recipientRole === "private"){
+    // محادثة خاصة: بتتعامل معاها دالة تانية
+    query = query.eq("recipient_role", "private");
+  } else if (isAdmin){
+    // ⭐ الأدمن يشوف كل الرسايل الموجّهة للـrole ده من أي حد
+    query = query.eq("recipient_role", recipientRole);
+  } else {
+    // المستخدم العادي: رسايله هو + الرسايل الموجهة للـrole بتاعه
+    query = query.or(`sender_id.eq.${CURRENT_PROFILE.id},recipient_role.eq.${recipientRole}`);
+  }
+
+  const { data, error } = await query;
+  if (error){ logError("تحميل الرسائل", error); return; }
+
+  if (!data || !data.length){
+    list.innerHTML = `<div class="empty-state">${lang === "en" ? "No messages yet 👋" : "لسه مفيش رسائل 👋"}</div>`;
+    return;
+  }
+  renderMessages(data, recipientRole);
   scrollMessagesToBottom();
 }
 
@@ -334,7 +353,6 @@ async function loadChatsPanel(){
   list.innerHTML=html;
 }
 
-/* Owner Dashboard */
 function wireOwnerTabs(){
   document.querySelectorAll(".nav-link[data-tab]").forEach(link=>{
     link.addEventListener("click",(e)=>{
@@ -632,7 +650,6 @@ async function deleteRow(table,id,refreshFn){
   await refreshFn();await loadKpis();
 }
 
-/* Video */
 function getYouTubeId(url){
   if(!url)return null;
   const patterns=[/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,/^([A-Za-z0-9_-]{11})$/];
@@ -704,7 +721,6 @@ async function loadStudentDashboard(profile){
   grid.innerHTML=courses.map(c=>buildCourseCard(c,lang)).join("");
 }
 
-/* Init */
 async function initApp(){
   const {data:{session},error:sessErr}=await supabaseClient.auth.getSession();
   if(sessErr){logError("فحص الجلسة",sessErr);showView("public");await loadHome();await wireWhatsAppButton();return;}

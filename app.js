@@ -1,5 +1,5 @@
 /* ============================================================
-   بسّطنا الإنجليزي — app.js v21 (كامل)
+   بسّطنا الإنجليزي — app.js v22 (كامل نهائي)
    ============================================================ */
 (function(){
   function makeMem(){
@@ -28,7 +28,11 @@ let CURRENT_PROFILE = null;
 let ALL_CONTACTS = [];
 let VIEW_MODE = localStorage.getItem("basetna_view_mode") || null;
 let ALL_COURSES_CACHE = [];
+let USER_GENDER = localStorage.getItem("basetna_gender") || null;
 
+/* ============================================================
+   Toast & Errors
+   ============================================================ */
 function ensureToastEl(){let el=document.getElementById("global-toast");if(!el){el=document.createElement("div");el.id="global-toast";el.className="global-toast";document.body.appendChild(el);}return el;}
 function showToast(msg,type="error",duration=6000){const el=ensureToastEl();el.className="global-toast show "+type;el.textContent=msg;clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>el.classList.remove("show"),duration);}
 function friendlyError(err){
@@ -52,7 +56,11 @@ function friendlyError(err){
 }
 function logError(ctx,err){console.error(`❌ [${ctx}]`,err);showToast(`⚠️ ${ctx}: ${friendlyError(err)}`,"error");}
 function logOk(ctx,msg){console.log(`✅ [${ctx}]`,msg||"");if(msg)showToast(`✅ ${msg}`,"ok",3500);}
+function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
+/* ============================================================
+   Countries
+   ============================================================ */
 const ARAB_COUNTRIES = [
   {dial:"20",ar:"مصر",en:"Egypt"},{dial:"966",ar:"السعودية",en:"Saudi Arabia"},
   {dial:"971",ar:"الإمارات",en:"UAE"},{dial:"965",ar:"الكويت",en:"Kuwait"},
@@ -79,6 +87,9 @@ function splitFullPhone(full){
   return{dial:"20",local:c};
 }
 
+/* ============================================================
+   Language
+   ============================================================ */
 function applyLanguage(lang){
   document.documentElement.lang=lang;
   document.documentElement.dir=lang==="ar"?"rtl":"ltr";
@@ -91,6 +102,9 @@ function applyLanguage(lang){
 }
 function toggleLanguage(){const cur=localStorage.getItem("basetna_lang")||"ar";applyLanguage(cur==="ar"?"en":"ar");}
 
+/* ============================================================
+   Views
+   ============================================================ */
 function showView(view){
   document.getElementById("view-public").hidden=view!=="public";
   document.getElementById("view-owner").hidden=view!=="owner";
@@ -98,9 +112,63 @@ function showView(view){
 }
 function hideSupportFabsForRole(){document.querySelectorAll(".support-fab").forEach(b=>{b.style.display="flex";});}
 function showMsg(el,text,type){el.textContent=text;el.className="form-msg "+type;}
-function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
-/* ===== Video Helpers ===== */
+/* ============================================================
+   👋 Welcome Modal (عزيز / عزيزة)
+   ============================================================ */
+function pickGender(gender){
+  USER_GENDER = gender;
+  localStorage.setItem("basetna_gender", gender);
+  const overlay = document.getElementById("welcome-overlay");
+  if(overlay) overlay.classList.remove("open");
+  updateWelcomeText();
+  showToast(gender === "female"
+    ? "👸 أهلاً بيكِ يا عزيزة 💛"
+    : "🤵 أهلاً بيك يا عزيز 💛", "ok", 2500);
+}
+window.pickGender = pickGender;
+
+function updateWelcomeText(){
+  const isFemale = USER_GENDER === "female";
+  const greetWord = isFemale ? "عزيزة" : "عزيز";
+  const greetEmoji = isFemale ? "👸" : "🤵";
+
+  const welcomeMsg = document.getElementById("welcome-msg");
+  if(welcomeMsg){
+    const name = CURRENT_PROFILE?.full_name || "";
+    welcomeMsg.textContent = name
+      ? `${greetEmoji} أهلاً بيك${isFemale ? "ِ" : ""} يا ${greetWord} ${name}`
+      : `${greetEmoji} أهلاً بيك${isFemale ? "ِ" : ""} يا ${greetWord}`;
+  }
+
+  const heroTitle = document.getElementById("hero-title");
+  if(heroTitle && !CURRENT_PROFILE){
+    heroTitle.textContent = isFemale
+      ? "الإنجليزي يبقى سهل وبسيط يا عزيزة 💛"
+      : "الإنجليزي يبقى سهل وبسيط يا عزيز 💛";
+  }
+}
+
+function showWelcomeModalIfNeeded(){
+  if(USER_GENDER){
+    const overlay = document.getElementById("welcome-overlay");
+    if(overlay) overlay.classList.remove("open");
+    return false;
+  }
+  const overlay = document.getElementById("welcome-overlay");
+  if(overlay) overlay.classList.add("open");
+  return true;
+}
+
+function showWelcomePickerAgain(){
+  const overlay = document.getElementById("welcome-overlay");
+  if(overlay) overlay.classList.add("open");
+}
+window.showWelcomePickerAgain = showWelcomePickerAgain;
+
+/* ============================================================
+   Video Helpers
+   ============================================================ */
 function extractYouTubeId(url){
   if(!url) return null;
   const patterns = [
@@ -127,7 +195,9 @@ function getVideoInfo(course){
   return null;
 }
 
-/* ===== Role Picker ===== */
+/* ============================================================
+   Role Picker
+   ============================================================ */
 function showRolePicker(){
   if(!CURRENT_PROFILE) return;
   const modal = document.getElementById("role-picker-overlay");
@@ -168,7 +238,9 @@ function updateRoleUI(){
   }
 }
 
-/* ===== Auth ===== */
+/* ============================================================
+   Auth
+   ============================================================ */
 async function handleLogin(e){
   e.preventDefault();
   const msg=document.getElementById("login-msg");
@@ -203,7 +275,9 @@ async function logout(e){
 }
 window.logout=logout;
 
-/* ===== WhatsApp ===== */
+/* ============================================================
+   WhatsApp
+   ============================================================ */
 async function getWhatsAppNumber(){
   const {data,error}=await supabaseClient.from("settings").select("whatsapp_number").eq("id",1).maybeSingle();
   if(error)return null;
@@ -222,7 +296,9 @@ async function subscribeViaWhatsApp(packageName){
   window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`,"_blank");
 }
 
-/* ===== Home ===== */
+/* ============================================================
+   Home
+   ============================================================ */
 async function loadHome(){
   const lang=localStorage.getItem("basetna_lang")||"ar";
   const levelsRes=await supabaseClient.from("grade_levels").select("*").order("sort_order");
@@ -242,7 +318,9 @@ async function loadHome(){
     :`<div class="empty-state">لسه مفيش باقات</div>`;
 }
 
-/* ===== Support ===== */
+/* ============================================================
+   Support / Chat
+   ============================================================ */
 async function openSupportPanel(recipientRole="support"){
   if(!CURRENT_PROFILE){showToast("⚠️ سجّل دخول الأول","error");return;}
   const overlay=document.getElementById("support-overlay");
@@ -296,7 +374,6 @@ async function renderGroupMembers(){
   container.innerHTML=`<div class="empty-state" style="padding:10px;">جاري التحميل...</div>`;
   const {data,error}=await supabaseClient.from("profiles").select("id, full_name, role").neq("id",CURRENT_PROFILE.id).order("role");
   if(error){logError("تحميل الأعضاء",error);return;}
-  const roleLabel=(r)=>r==="superadmin"?"👑":r==="owner"?"الميس":r==="support"?"دعم":"طالب";
   const avatar=(r)=>r==="superadmin"?"👑":r==="owner"?"👩‍🏫":r==="support"?"🛠️":"🎓";
   container.innerHTML=`<div class="group-members-title">👥 الأعضاء</div>`+
     (data||[]).map(u=>`<span class="group-member-chip" onclick="startPrivateChat('${u.id}','${escapeHtml(u.full_name).replace(/'/g,"&#39;")}')"><span class="chip-avatar">${avatar(u.role)}</span>${escapeHtml(u.full_name)}</span>`).join("");
@@ -381,7 +458,9 @@ async function loadChatsPanel(){
   list.innerHTML=html;
 }
 
-/* ===== Owner Tabs ===== */
+/* ============================================================
+   Owner Tabs
+   ============================================================ */
 function wireOwnerTabs(){
   document.querySelectorAll(".nav-link[data-tab]").forEach(link=>{
     link.addEventListener("click",(e)=>{
@@ -442,7 +521,9 @@ async function loadKpis(){
   document.getElementById("kpi-levels").textContent=CURRENT_LEVELS.length;
 }
 
-/* ===== Stats / التقارير ===== */
+/* ============================================================
+   Stats
+   ============================================================ */
 async function loadStats(){
   const el = document.getElementById("stats-content");
   if(!el) return;
@@ -526,7 +607,9 @@ async function loadStats(){
 }
 window.loadStats = loadStats;
 
-/* ===== Levels ===== */
+/* ============================================================
+   Levels
+   ============================================================ */
 async function loadLevels(){
   const {data,error}=await supabaseClient.from("grade_levels").select("*").order("sort_order");
   if(error){logError("تحميل المراحل",error);return;}
@@ -551,13 +634,14 @@ function openLevelForm(level){
   });
 }
 
-/* ===== Courses ===== */
+/* ============================================================
+   Courses
+   ============================================================ */
 async function loadCourses(){
   const {data,error}=await supabaseClient.from("courses").select("*, grade_levels(name_ar)").order("sort_order");
   if(error){logError("تحميل الكورسات",error);return;}
   ALL_COURSES_CACHE = data || [];
 
-  // جلب عدد الفيديوهات والتقييم لكل كورس
   const courseIds = (data || []).map(c => c.id);
   let lessonsCount = {};
   let ratingsAvg = {};
@@ -631,7 +715,9 @@ function openCourseForm(course){
   });
 }
 
-/* ===== Lessons Manager ===== */
+/* ============================================================
+   Lessons Manager
+   ============================================================ */
 async function openLessonsManager(courseId, courseTitle){
   const { data: lessons } = await supabaseClient.from("lessons").select("*").eq("course_id", courseId).order("sort_order");
   const list = lessons || [];
@@ -701,9 +787,9 @@ function openLessonForm(courseId){
     const t = typeSel.value;
     fileField.hidden = (t !== "file");
     urlField.hidden  = (t === "file");
-    if(t === "youtube"){ urlLabel.textContent = "رابط الفيديو على يوتيوب"; urlHint.textContent = "الصق رابط يوتيوب — الموقع هيشغّله داخل صفحة الكورس"; urlInput.placeholder = "https://youtu.be/xxxxxxxxxxx"; }
-    else if(t === "vimeo"){ urlLabel.textContent = "رابط الفيديو على فيميو"; urlHint.textContent = "الصق رابط فيميو — الموقع هيشغّله داخل صفحة الكورس"; urlInput.placeholder = "https://vimeo.com/123456789"; }
-    else if(t === "drive"){ urlLabel.textContent = "رابط الملف على جوجل درايف"; urlHint.textContent = "الصق رابط المشاركة من جوجل درايف"; urlInput.placeholder = "https://drive.google.com/file/d/xxxxx/view"; }
+    if(t === "youtube"){ urlLabel.textContent = "رابط الفيديو على يوتيوب"; urlHint.textContent = "الصق رابط يوتيوب"; urlInput.placeholder = "https://youtu.be/xxxxxxxxxxx"; }
+    else if(t === "vimeo"){ urlLabel.textContent = "رابط الفيديو على فيميو"; urlHint.textContent = "الصق رابط فيميو"; urlInput.placeholder = "https://vimeo.com/123456789"; }
+    else if(t === "drive"){ urlLabel.textContent = "رابط الملف على جوجل درايف"; urlHint.textContent = "الصق رابط المشاركة"; urlInput.placeholder = "https://drive.google.com/file/d/xxxxx/view"; }
   };
   typeSel.addEventListener("change", toggleType); toggleType();
 
@@ -760,7 +846,9 @@ async function deleteLesson(id, courseId, courseTitle){
 }
 window.deleteLesson = deleteLesson;
 
-/* ===== Course Player ===== */
+/* ============================================================
+   Course Player
+   ============================================================ */
 async function openCoursePlayer(courseId, courseTitle){
   const [courseRes, lessonsRes, ratingRes] = await Promise.all([
     supabaseClient.from("courses").select("*").eq("id", courseId).single(),
@@ -854,7 +942,9 @@ function closeCoursePlayer(){
 }
 window.closeCoursePlayer = closeCoursePlayer;
 
-/* ===== Packages ===== */
+/* ============================================================
+   Packages
+   ============================================================ */
 async function loadPackages(){
   const {data,error}=await supabaseClient.from("packages").select("*, grade_levels(name_ar)");
   if(error){logError("تحميل الباقات",error);return;}
@@ -878,7 +968,9 @@ function openPackageForm(pkg){
   });
 }
 
-/* ===== Students ===== */
+/* ============================================================
+   Students
+   ============================================================ */
 function openAddStudentForm(){
   if(!CURRENT_LEVELS.length){showToast("⚠️ أضف مرحلة أول","error");return;}
   document.getElementById("form-modal-content").innerHTML=`<button class="close" onclick="closeFormModal()">✕</button><h3>إضافة طالب</h3><form id="add-student-form"><div class="field"><label>الاسم</label><input type="text" id="as-name" required></div><div class="field"><label>الإيميل</label><input type="email" id="as-email" required></div><div class="field"><label>الهاتف</label><input type="tel" id="as-phone"></div><div class="field"><label>كلمة مرور</label><input type="text" id="as-password" required minlength="6"></div><div class="field"><label>المرحلة</label><select id="as-level">${levelOptions()}</select></div><button class="btn btn-gold btn-block" type="submit">إنشاء</button><div class="form-msg" id="add-student-msg"></div></form>`;
@@ -950,7 +1042,9 @@ function openSubscriptionForm(studentId,studentName){
   });
 }
 
-/* ===== Settings ===== */
+/* ============================================================
+   Settings
+   ============================================================ */
 async function loadOwnerSettings(){
   fillCountrySelect("20");
   const {data,error}=await supabaseClient.from("settings").select("*").eq("id",1).maybeSingle();
@@ -980,7 +1074,9 @@ async function deleteRow(table,id,refreshFn){
   await refreshFn();await loadKpis();
 }
 
-/* ===== Search ===== */
+/* ============================================================
+   Search
+   ============================================================ */
 function filterCourses(){
   const q = (document.getElementById("search-input")?.value || "").toLowerCase();
   const cards = document.querySelectorAll("#packages-grid .course-card, #levels-grid .course-card");
@@ -1001,7 +1097,9 @@ function filterStudentCourses(){
 }
 window.filterStudentCourses = filterStudentCourses;
 
-/* ===== Course Card (للطالب) ===== */
+/* ============================================================
+   Course Card for Students
+   ============================================================ */
 function buildCourseCard(course, lang){
   const title = lang === "ar" ? course.title_ar : (course.title_en || course.title_ar);
   const desc  = lang === "ar" ? (course.description_ar || "") : (course.description_en || "");
@@ -1024,42 +1122,20 @@ function buildCourseCard(course, lang){
         <h3>${title}</h3>
         <p>${desc}</p>
         <button class="btn btn-teal btn-block" onclick='openCoursePlayer("${course.id}", ${JSON.stringify(title)})'>🎬 مشاهدة الكورس</button>
-        <button class="btn btn-ghost btn-block btn-sm" style="margin-top:6px;" onclick='openRatingModal("${course.id}", ${JSON.stringify(title)})'>⭐ قيّم الكورس</button>
       </div>
     </div>`;
 }
 
-/* ===== Modal تقييم منفصل ===== */
-async function openRatingModal(courseId, courseTitle){
-  const { data: myRating } = await supabaseClient.from("course_ratings").select("*").eq("course_id", courseId).eq("student_id", CURRENT_PROFILE.id).maybeSingle();
-  document.getElementById("form-modal-content").innerHTML = `
-    <button class="close" onclick="closeFormModal()">✕</button>
-    <h3>⭐ قيّم "${escapeHtml(courseTitle)}"</h3>
-    <div style="text-align:center;padding:20px 0;">
-      <div class="rating-stars" id="rating-stars-modal" style="justify-content:center;display:flex;gap:10px;">
-        ${[1,2,3,4,5].map(n => `<span class="star ${myRating && myRating.rating >= n ? "active" : ""}" onclick="submitRatingModal('${courseId}', ${n})">★</span>`).join("")}
-      </div>
-      <p id="rating-modal-msg" style="margin-top:14px;color:var(--teal);font-weight:700;">
-        ${myRating ? "شكراً لتقييمك 💛" : "اضغط على النجوم"}
-      </p>
-    </div>`;
-  document.getElementById("form-overlay").classList.add("open");
-}
-window.openRatingModal = openRatingModal;
-
-async function submitRatingModal(courseId, rating){
-  const { error } = await supabaseClient.from("course_ratings").upsert({course_id: courseId, student_id: CURRENT_PROFILE.id, rating: rating}, { onConflict: "course_id,student_id" });
-  if(error){ logError("حفظ التقييم", error); return; }
-  document.querySelectorAll("#rating-stars-modal .star").forEach((s, i) => s.classList.toggle("active", i < rating));
-  document.getElementById("rating-modal-msg").textContent = "✅ شكراً لتقييمك 💛";
-  showToast("✅ تم التقييم", "ok", 1500);
-}
-window.submitRatingModal = submitRatingModal;
-
-/* ===== Student Dashboard ===== */
+/* ============================================================
+   Student Dashboard
+   ============================================================ */
 async function loadStudentDashboard(profile){
   const lang=localStorage.getItem("basetna_lang")||"ar";
-  document.getElementById("welcome-msg").textContent=(lang==="en"?"Welcome, ":"أهلاً بيك يا ")+profile.full_name;
+  const isFemale = USER_GENDER === "female";
+  const greetWord = isFemale ? "عزيزة" : "عزيز";
+  const greetEmoji = isFemale ? "👸" : "🤵";
+  document.getElementById("welcome-msg").textContent = `${greetEmoji} أهلاً بيك${isFemale ? "ِ" : ""} يا ${greetWord} ${profile.full_name}`;
+
   const subsRes=await supabaseClient.from("subscriptions").select("*").eq("student_id",profile.id).order("created_at",{ascending:false}).limit(1);
   const latestSub=subsRes.data?.[0];
   const endOfDay=latestSub?new Date(latestSub.end_date+"T23:59:59"):null;
@@ -1083,11 +1159,16 @@ async function loadStudentDashboard(profile){
   grid.innerHTML=courses.map(c=>buildCourseCard(c,lang)).join("");
 }
 
-/* ===== Init ===== */
+/* ============================================================
+   Init
+   ============================================================ */
 async function initApp(){
+  // أول حاجة: عرض مودال الترحيب لو أول مرة
+  showWelcomeModalIfNeeded();
+
   const {data:{session},error:sessErr}=await supabaseClient.auth.getSession();
-  if(sessErr){logError("فحص الجلسة",sessErr);showView("public");await loadHome();await wireWhatsAppButton();return;}
-  if(!session){showView("public");await loadHome();await wireWhatsAppButton();return;}
+  if(sessErr){logError("فحص الجلسة",sessErr);showView("public");await loadHome();await wireWhatsAppButton();updateWelcomeText();return;}
+  if(!session){showView("public");await loadHome();await wireWhatsAppButton();updateWelcomeText();return;}
 
   const profRes=await supabaseClient.from("profiles").select("*").eq("id",session.user.id).maybeSingle();
   if(profRes.error){logError("تحميل البروفايل",profRes.error);showView("public");await loadHome();await wireWhatsAppButton();return;}
@@ -1118,6 +1199,7 @@ async function initApp(){
   }
   await wireWhatsAppButton();
   updateRoleUI();
+  updateWelcomeText();
 }
 
 document.addEventListener("DOMContentLoaded",async()=>{

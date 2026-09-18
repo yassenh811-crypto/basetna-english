@@ -29,7 +29,7 @@
     <div class="container row">
       <div class="hero-copy">
         <span class="eyebrow-pill">منصة تعليمية بإشراف مس. شيرهان علي</span>
-        <h1>الإنجليزي يبقى سهل وبسيط مع مس. شيرهان</h1>
+        <h1 id="hero-title">الإنجليزي يبقى سهل وبسيط مع مس. شيرهان</h1>
         <p class="lead">كورسات مرتبة على حسب مرحلتك الدراسية، سلسلة فيديوهات لكل كورس، ومتابعة مباشرة.</p>
         <div class="hero-actions">
           <button class="btn btn-gold" onclick="openAuthModal()">تسجيل الدخول</button>
@@ -69,6 +69,33 @@
   <footer><div class="container">
     <p><strong>بسّطنا الإنجليزي</strong> · بإشراف مس. شيرهان علي</p>
   </div></footer>
+</div>
+
+<!-- ============================================================
+     WELCOME MODAL (أول ما يفتح الموقع)
+     ============================================================ -->
+<div class="overlay" id="welcome-overlay">
+  <div class="modal welcome-modal">
+    <div class="welcome-logo">✨</div>
+    <h2>أهلاً بيك في بسّطنا الإنجليزي</h2>
+    <p class="sub">من فضلك حدد نوعك عشان نرحّب بيك بشكل مناسب 👇</p>
+
+    <div class="welcome-choice" onclick="pickGender('female')">
+      <div class="welcome-icon" style="background:linear-gradient(135deg,#E91E63,#AD1457)">👸</div>
+      <div class="welcome-info">
+        <div class="welcome-title">عزيزة</div>
+        <div class="welcome-desc">طالبة / ميس / زائرة</div>
+      </div>
+    </div>
+
+    <div class="welcome-choice" onclick="pickGender('male')">
+      <div class="welcome-icon" style="background:linear-gradient(135deg,#1976D2,#0D47A1)">🤵</div>
+      <div class="welcome-info">
+        <div class="welcome-title">عزيز</div>
+        <div class="welcome-desc">طالب / مستر / زائر</div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ============================================================
@@ -135,6 +162,10 @@
       <a href="#" class="nav-link" data-tab="chats">💬 المحادثات</a>
       <a href="#" class="nav-link" data-tab="inbox">📥 صندوق الرسائل</a>
       <a href="#" class="nav-link" data-tab="settings">الإعدادات</a>
+      <button class="role-toggle-btn" style="background:linear-gradient(135deg,#E91E63,#1976D2);margin-top:8px;"
+              onclick="showWelcomePickerAgain()">
+        👋 تغيير نوع الترحيب
+      </button>
       <button class="lang-switch" style="margin-top:10px;">English</button>
       <a href="#" class="logout">تسجيل الخروج</a>
     </aside>
@@ -227,6 +258,10 @@
     <aside class="sidebar">
       <div class="brand"><span class="mark">EN</span> بسّطنا الإنجليزي</div>
       <a href="#" class="active">كورساتي</a>
+      <button class="role-toggle-btn" style="background:linear-gradient(135deg,#E91E63,#1976D2);margin-top:8px;"
+              onclick="showWelcomePickerAgain()">
+        👋 تغيير نوع الترحيب
+      </button>
       <button class="lang-switch" style="margin-top:10px;">English</button>
       <a href="#" class="logout">تسجيل الخروج</a>
     </aside>

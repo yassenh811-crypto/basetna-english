@@ -20,7 +20,7 @@
 
 const SUPABASE_URL = "https://wgostqkywpybmzgbyzeo.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_zx0zeWR2bpbmyO90oN-4ow_FxZCSPl8";
-const OWNER_USERNAME_MAP = {"yassen":"yassen@basetna-english.com","shere":"shere@basetna-english.com"};
+const OWNER_USERNAME_MAP = {"yassen":"yassenq14232@gmail.com","shere":"shere@basetna-english.com"};
 const SERIAL_MAP = {"yassen":"serial-2.2.2-yassen","shere":"serial_1.1.1_shere"};
 const STORAGE_BUCKET = "course-files";
 const ADMIN_ROLES = ["superadmin","owner","support"];

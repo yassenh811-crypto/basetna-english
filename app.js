@@ -1,5 +1,9 @@
 /* ============================================================
-   بسّطنا الإنجليزي — app.js v12 (كامل نهائي)
+   بسّطنا الإنجليزي — app.js v13
+   - ياسين superadmin (أعلى من الميس)
+   - رفع فيديو من الموبايل
+   - شات + دعم + محادثة خاصة
+   - حماية localStorage
    ============================================================ */
 (function(){
   function makeMem(){
@@ -20,12 +24,14 @@ const SUPABASE_ANON_KEY = "sb_publishable_zx0zeWR2bpbmyO90oN-4ow_FxZCSPl8";
 const OWNER_USERNAME_MAP = {"yassen":"yassen@basetna-english.com","shere":"shere@basetna-english.com"};
 const SERIAL_MAP = {"yassen":"serial-2.2.2-yassen","shere":"serial_1.1.1_shere"};
 const STORAGE_BUCKET = "course-files";
+const ADMIN_ROLES = ["superadmin","owner","support"];
 const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 let CURRENT_LEVELS = [];
 let CURRENT_PROFILE = null;
 let ALL_CONTACTS = [];
 
+/* Toast */
 function ensureToastEl(){let el=document.getElementById("global-toast");if(!el){el=document.createElement("div");el.id="global-toast";el.className="global-toast";document.body.appendChild(el);}return el;}
 function showToast(msg,type="error",duration=6000){const el=ensureToastEl();el.className="global-toast show "+type;el.textContent=msg;clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>el.classList.remove("show"),duration);}
 function friendlyError(err){
@@ -76,6 +82,7 @@ function splitFullPhone(full){
   return{dial:"20",local:c};
 }
 
+/* Language */
 function applyLanguage(lang){
   document.documentElement.lang=lang;
   document.documentElement.dir=lang==="ar"?"rtl":"ltr";
@@ -96,6 +103,7 @@ function showView(view){
 function hideSupportFabsForRole(){}
 function showMsg(el,text,type){el.textContent=text;el.className="form-msg "+type;}
 
+/* Auth */
 async function handleLogin(e){
   e.preventDefault();
   const msg=document.getElementById("login-msg");
@@ -133,6 +141,7 @@ async function logout(e){
 }
 window.logout=logout;
 
+/* WhatsApp */
 async function getWhatsAppNumber(){
   const {data,error}=await supabaseClient.from("settings").select("whatsapp_number").eq("id",1).maybeSingle();
   if(error){logError("جلب رقم الواتساب",error);return null;}
@@ -151,6 +160,7 @@ async function subscribeViaWhatsApp(packageName){
   window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`,"_blank");
 }
 
+/* Home */
 async function loadHome(){
   const lang=localStorage.getItem("basetna_lang")||"ar";
   const levelsRes=await supabaseClient.from("grade_levels").select("*").order("sort_order");
@@ -173,6 +183,7 @@ async function loadHome(){
     :`<div class="empty-state">${lang==="ar"?"لسه مفيش باقات":"No packages yet"}</div>`;
 }
 
+/* Support */
 function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 async function openSupportPanel(recipientRole="support"){
@@ -217,10 +228,10 @@ function renderMessages(messages){
   const lang=localStorage.getItem("basetna_lang")||"ar";
   list.innerHTML=messages.map(m=>{
     const isMine=m.sender_id===CURRENT_PROFILE.id;
-    const isAdminMsg=m.sender_role==="owner"||m.sender_role==="support";
+    const isAdminMsg=ADMIN_ROLES.includes(m.sender_role);
     const time=new Date(m.created_at).toLocaleString(lang==="ar"?"ar-EG":"en-US",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"});
-    const avatarEmoji=m.sender_role==="owner"?"👩‍🏫":m.sender_role==="support"?"🛠️":"🎓";
-    const roleName=m.sender_role==="owner"?(lang==="ar"?"الميس":"Teacher"):m.sender_role==="support"?(lang==="ar"?"دعم فني":"Support"):(lang==="ar"?"طالب":"Student");
+    const avatarEmoji=m.sender_role==="superadmin"?"👑":m.sender_role==="owner"?"👩‍🏫":m.sender_role==="support"?"🛠️":"🎓";
+    const roleName=m.sender_role==="superadmin"?(lang==="ar"?"👑 المدير الأعلى":"👑 Super Admin"):m.sender_role==="owner"?(lang==="ar"?"الميس":"Teacher"):m.sender_role==="support"?(lang==="ar"?"دعم فني":"Support"):(lang==="ar"?"طالب":"Student");
     return `<div class="msg ${isMine?"mine":""} ${isAdminMsg?"admin-msg":""}">${!isMine?`<div class="msg-avatar">${avatarEmoji}</div>`:""}<div class="msg-bubble">${!isMine?`<div class="msg-name">${escapeHtml(m.sender_name)} <span class="role-tag">${roleName}</span></div>`:""}<div class="msg-text">${escapeHtml(m.content)}</div><div class="msg-time">${time}</div></div></div>`;
   }).join("");
 }
@@ -232,9 +243,9 @@ async function renderGroupMembers(){
   container.innerHTML=`<div class="empty-state" style="padding:10px;font-size:12.5px;">جاري تحميل الأعضاء...</div>`;
   const {data,error}=await supabaseClient.from("profiles").select("id, full_name, role").neq("id",CURRENT_PROFILE.id).order("role",{ascending:true});
   if(error){logError("تحميل الأعضاء",error);container.innerHTML="";return;}
-  const roleLabel=(r)=>r==="owner"?"الميس":r==="support"?"دعم فني":"طالب";
-  const roleClass=(r)=>r==="owner"?"owner":r==="support"?"support":"";
-  const avatar=(r)=>r==="owner"?"👩‍🏫":r==="support"?"🛠️":"🎓";
+  const roleLabel=(r)=>r==="superadmin"?"👑 المدير":r==="owner"?"الميس":r==="support"?"دعم فني":"طالب";
+  const roleClass=(r)=>r==="superadmin"?"owner":r==="owner"?"owner":r==="support"?"support":"";
+  const avatar=(r)=>r==="superadmin"?"👑":r==="owner"?"👩‍🏫":r==="support"?"🛠️":"🎓";
   let chipsHtml="";
   if(data&&data.length){
     chipsHtml=data.map(u=>`<span class="group-member-chip ${roleClass(u.role)}" onclick="startPrivateChat('${u.id}','${escapeHtml(u.full_name).replace(/'/g,"&#39;")}')"><span class="chip-avatar">${avatar(u.role)}</span>${escapeHtml(u.full_name)}<span class="role-tag" style="margin-inline-start:4px;">${roleLabel(u.role)}</span></span>`).join("");
@@ -307,20 +318,23 @@ async function loadChatsPanel(){
   if(error){logError("تحميل جهات الاتصال",error);return;}
   ALL_CONTACTS=data||[];
   if(!ALL_CONTACTS.length){list.innerHTML=`<div class="empty-state">لسه مفيش مستخدمين</div>`;return;}
-  const avatar=(r)=>r==="owner"?"👩‍🏫":r==="support"?"🛠️":"🎓";
-  const roleLabel=(r)=>r==="owner"?"الميس":r==="support"?"دعم فني":"طالب";
-  const roleColor=(r)=>r==="owner"?"var(--gold)":r==="support"?"var(--purple)":"var(--teal)";
+  const avatar=(r)=>r==="superadmin"?"👑":r==="owner"?"👩‍🏫":r==="support"?"🛠️":"🎓";
+  const roleLabel=(r)=>r==="superadmin"?"👑 المدير":r==="owner"?"الميس":r==="support"?"دعم فني":"طالب";
+  const roleColor=(r)=>r==="superadmin"?"#B8860B":r==="owner"?"var(--gold)":r==="support"?"var(--purple)":"var(--teal)";
+  const supers=ALL_CONTACTS.filter(c=>c.role==="superadmin");
   const owners=ALL_CONTACTS.filter(c=>c.role==="owner");
   const supports=ALL_CONTACTS.filter(c=>c.role==="support");
   const students=ALL_CONTACTS.filter(c=>c.role==="student");
   const renderCard=(c)=>`<div class="chat-contact" onclick='startPrivateChat("${c.id}","${escapeHtml(c.full_name).replace(/'/g,"&#39;")}")'><div class="chat-contact-avatar" style="background:${roleColor(c.role)}">${avatar(c.role)}</div><div class="chat-contact-info"><div class="chat-contact-name">${escapeHtml(c.full_name)}</div><div class="chat-contact-meta"><span class="role-tag" style="background:${roleColor(c.role)}">${roleLabel(c.role)}</span>${c.grade_levels?.name_ar?`<span class="chat-grade">${escapeHtml(c.grade_levels.name_ar)}</span>`:""}${c.phone?`<span class="chat-phone">📱 ${escapeHtml(c.phone)}</span>`:""}</div></div><div class="chat-contact-action">💬</div></div>`;
   let html="";
-  if(students.length)html+=`<div class="chat-section-title">🎓 الطلاب <span class="chat-count">${students.length}</span></div>`+students.map(renderCard).join("");
-  if(supports.length)html+=`<div class="chat-section-title">🛠️ الدعم الفني <span class="chat-count">${supports.length}</span></div>`+supports.map(renderCard).join("");
+  if(supers.length)html+=`<div class="chat-section-title">👑 المدير الأعلى <span class="chat-count">${supers.length}</span></div>`+supers.map(renderCard).join("");
   if(owners.length)html+=`<div class="chat-section-title">👩‍🏫 الميس <span class="chat-count">${owners.length}</span></div>`+owners.map(renderCard).join("");
+  if(supports.length)html+=`<div class="chat-section-title">🛠️ الدعم الفني <span class="chat-count">${supports.length}</span></div>`+supports.map(renderCard).join("");
+  if(students.length)html+=`<div class="chat-section-title">🎓 الطلاب <span class="chat-count">${students.length}</span></div>`+students.map(renderCard).join("");
   list.innerHTML=html;
 }
 
+/* Owner Dashboard */
 function wireOwnerTabs(){
   document.querySelectorAll(".nav-link[data-tab]").forEach(link=>{
     link.addEventListener("click",(e)=>{
@@ -618,6 +632,7 @@ async function deleteRow(table,id,refreshFn){
   await refreshFn();await loadKpis();
 }
 
+/* Video */
 function getYouTubeId(url){
   if(!url)return null;
   const patterns=[/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,/^([A-Za-z0-9_-]{11})$/];
@@ -689,6 +704,7 @@ async function loadStudentDashboard(profile){
   grid.innerHTML=courses.map(c=>buildCourseCard(c,lang)).join("");
 }
 
+/* Init */
 async function initApp(){
   const {data:{session},error:sessErr}=await supabaseClient.auth.getSession();
   if(sessErr){logError("فحص الجلسة",sessErr);showView("public");await loadHome();await wireWhatsAppButton();return;}
@@ -697,11 +713,18 @@ async function initApp(){
   if(profRes.error){logError("تحميل البروفايل",profRes.error);showView("public");await loadHome();await wireWhatsAppButton();return;}
   if(!profRes.data){showToast("⚠️ حسابك موجود لكن مفيش بروفايل","error",8000);showView("public");await loadHome();await wireWhatsAppButton();return;}
   CURRENT_PROFILE=profRes.data;
-  if(CURRENT_PROFILE.role==="owner"||CURRENT_PROFILE.role==="support"){
-    showView("owner");wireOwnerTabs();hideSupportFabsForRole(CURRENT_PROFILE.role);
+  if(ADMIN_ROLES.includes(CURRENT_PROFILE.role)){
+    showView("owner");
+    wireOwnerTabs();
+    hideSupportFabsForRole(CURRENT_PROFILE.role);
+    if(CURRENT_PROFILE.role==="superadmin"){
+      document.body.classList.add("is-superadmin");
+      document.title="👑 "+document.title;
+    }
     await refreshOwnerData();
   }else{
-    showView("student");hideSupportFabsForRole("student");
+    showView("student");
+    hideSupportFabsForRole("student");
     await loadStudentDashboard(CURRENT_PROFILE);
   }
   await wireWhatsAppButton();

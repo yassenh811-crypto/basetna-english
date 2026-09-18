@@ -1572,24 +1572,117 @@ async function initApp(){
   updateWelcomeText();
 }
 
-document.addEventListener("DOMContentLoaded",async()=>{
-  applyLanguage(localStorage.getItem("basetna_lang")||"ar");
-  document.querySelectorAll(".lang-switch").forEach(btn=>btn.addEventListener("click",toggleLanguage));
-  document.getElementById("login-form")?.addEventListener("submit",handleLogin);
-  document.getElementById("settings-form")?.addEventListener("submit",saveSettings);
-  document.querySelectorAll(".logout").forEach(el=>el.addEventListener("click",logout));
-  watchOwnerField();
-  document.getElementById("support-send")?.addEventListener("click",sendSupportMessage);
-  document.getElementById("support-input")?.addEventListener("keydown",e=>{
-    if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendSupportMessage();}
+/* ============================================================
+   ربط كل الأزرار
+   ============================================================ */
+function wireAllEvents(){
+  console.log("🔗 Wiring all events...");
+
+  // Dark mode
+  document.querySelectorAll(".theme-btn").forEach(btn => {
+    btn.replaceWith(btn.cloneNode(true));
   });
-  document.getElementById("support-close")?.addEventListener("click",closeSupportPanel);
+  document.querySelectorAll(".theme-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggleDarkMode();
+    });
+  });
+
+  // Theme picker
+  const themePicker = document.getElementById("student-theme-picker");
+  if(themePicker){
+    themePicker.value = localStorage.getItem("basetna_theme") || "default";
+    themePicker.addEventListener("change", (e) => {
+      applyStudentTheme(e.target.value);
+      showToast("🎨 تم تغيير الثيم", "ok", 1500);
+    });
+  }
+
+  // Lang switch
+  document.querySelectorAll(".lang-switch").forEach(btn => {
+    btn.replaceWith(btn.cloneNode(true));
+  });
+  document.querySelectorAll(".lang-switch").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggleLanguage();
+    });
+  });
+
+  // Logout
+  document.querySelectorAll(".logout").forEach(el => {
+    el.replaceWith(el.cloneNode(true));
+  });
+  document.querySelectorAll(".logout").forEach(el => {
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      logout(e);
+    });
+  });
+
+  // Login form
+  const loginForm = document.getElementById("login-form");
+  if(loginForm && !loginForm.dataset.bound){
+    loginForm.addEventListener("submit", handleLogin);
+    loginForm.dataset.bound = "1";
+  }
+
+  // Settings form
+  const settingsForm = document.getElementById("settings-form");
+  if(settingsForm && !settingsForm.dataset.bound){
+    settingsForm.addEventListener("submit", saveSettings);
+    settingsForm.dataset.bound = "1";
+  }
+
+  // Support send
+  const supportSend = document.getElementById("support-send");
+  if(supportSend && !supportSend.dataset.bound){
+    supportSend.addEventListener("click", sendSupportMessage);
+    supportSend.dataset.bound = "1";
+  }
+
+  const supportInput = document.getElementById("support-input");
+  if(supportInput && !supportInput.dataset.bound){
+    supportInput.addEventListener("keydown", e => {
+      if(e.key === "Enter" && !e.shiftKey){
+        e.preventDefault();
+        sendSupportMessage();
+      }
+    });
+    supportInput.dataset.bound = "1";
+  }
+
+  const supportClose = document.getElementById("support-close");
+  if(supportClose && !supportClose.dataset.bound){
+    supportClose.addEventListener("click", closeSupportPanel);
+    supportClose.dataset.bound = "1";
+  }
+
+  console.log("✅ All events wired");
+}
+
+document.addEventListener("DOMContentLoaded", async () => {
+  console.log("🚀 DOMContentLoaded");
+
+  // Init dark mode
+  const savedDark = localStorage.getItem("basetna_dark") === "1";
+  applyDarkMode(savedDark);
+
+  // Init theme
+  const savedTheme = localStorage.getItem("basetna_theme") || "default";
+  applyStudentTheme(savedTheme);
+
+  // Init language
+  applyLanguage(localStorage.getItem("basetna_lang") || "ar");
+
+  // Wire events
+  wireAllEvents();
+
+  watchOwnerField();
+
   await initApp();
-});
 
-window.addEventListener("unhandledrejection",(e)=>{
-  console.error("❌ Unhandled:",e.reason);
+  // Rewire after initApp (لأن العناصر بتظهر ديناميكيًا)
+  setTimeout(wireAllEvents, 500);
 });
-
-window.supabaseClient = supabaseClient;
-window.CURRENT_PROFILE = () => CURRENT_PROFILE;

@@ -5,260 +5,211 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>بسّطنا الإنجليزي | Basetna English</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
-<meta name="description" content="منصة بسّطنا الإنجليزي — كورسات إنجليزي بإشراف مس. شيرهان علي">
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
-<!-- ================= PUBLIC ================= -->
 <div id="view-public">
-  <div class="topbar">
-    <div class="row">
-      <div class="brand"><span class="mark">EN</span> بسّطنا الإنجليزي</div>
-      <div class="topbar-actions">
-        <button class="lang-switch">English</button>
-        <button class="btn btn-gold btn-sm" onclick="openAuthModal()" data-i18n data-ar="تسجيل الدخول" data-en="Log in"></button>
-      </div>
+  <div class="topbar"><div class="row">
+    <div class="brand"><span class="mark">EN</span> بسّطنا الإنجليزي</div>
+    <div class="topbar-actions">
+      <button class="lang-switch">English</button>
+      <button class="btn btn-gold btn-sm" onclick="openAuthModal()">تسجيل الدخول</button>
     </div>
-  </div>
+  </div></div>
 
-  <section class="hero">
-    <div class="container row">
-      <div class="hero-copy">
-        <span class="eyebrow-pill" data-i18n data-ar="منصة تعليمية بإشراف مس. شيرهان علي" data-en="Led by ms. sherehan ali"></span>
-        <h1 data-i18n data-ar="الإنجليزي يبقى سهل وبسيط مع مس. شيرهان" data-en="English becomes simple with ms. sherehan"></h1>
-        <p class="lead" data-i18n data-ar="كورسات مرتبة على حسب مرحلتك الدراسية، فيديوهات وملفات في مكان واحد، ومتابعة مباشرة من مس. شيرهان." data-en="Courses organized by your stage, videos and files in one place."></p>
-        <div class="hero-actions">
-          <button class="btn btn-gold" onclick="openAuthModal()" data-i18n data-ar="تسجيل الدخول" data-en="Log in"></button>
-          <a class="btn btn-outline" href="#packages" data-i18n data-ar="شوف الباقات" data-en="See packages"></a>
-        </div>
-      </div>
-      <div class="hero-visual">
-        <div class="stat"><span data-i18n data-ar="مراحل دراسية متاحة" data-en="Study stages"></span><b id="stat-levels">—</b></div>
-        <div class="stat"><span data-i18n data-ar="كورسات على المنصة" data-en="Courses"></span><b id="stat-courses">—</b></div>
-        <div class="stat"><span data-i18n data-ar="باقات اشتراك" data-en="Packages"></span><b id="stat-packages">—</b></div>
+  <section class="hero"><div class="container row">
+    <div class="hero-copy">
+      <span class="eyebrow-pill">منصة تعليمية بإشراف مس. شيرهان علي</span>
+      <h1>الإنجليزي يبقى سهل وبسيط مع مس. شيرهان</h1>
+      <p class="lead">كورسات مرتبة على حسب مرحلتك الدراسية، فيديوهات وملفات في مكان واحد.</p>
+      <div class="hero-actions">
+        <button class="btn btn-gold" onclick="openAuthModal()">تسجيل الدخول</button>
+        <a class="btn btn-outline" href="#packages">شوف الباقات</a>
       </div>
     </div>
-  </section>
+    <div class="hero-visual">
+      <div class="stat"><span>مراحل دراسية</span><b id="stat-levels">—</b></div>
+      <div class="stat"><span>كورسات</span><b id="stat-courses">—</b></div>
+      <div class="stat"><span>باقات اشتراك</span><b id="stat-packages">—</b></div>
+    </div>
+  </div></section>
 
-  <section class="block" id="levels">
-    <div class="container">
-      <div class="section-head">
-        <h2 data-i18n data-ar="المراحل الدراسية" data-en="Study Stages"></h2>
-        <p data-i18n data-ar="اختار مرحلتك عشان تشوف الكورسات المناسبة ليك" data-en="Pick your stage"></p>
-      </div>
-      <div class="grid grid-4" id="levels-grid">
-        <div class="empty-state" data-i18n data-ar="جاري تحميل المراحل..." data-en="Loading..."></div>
-      </div>
-    </div>
-  </section>
+  <section class="block" id="levels"><div class="container">
+    <div class="section-head"><h2>المراحل الدراسية</h2></div>
+    <div class="grid grid-4" id="levels-grid"><div class="empty-state">جاري التحميل...</div></div>
+  </div></section>
 
-  <section class="block" id="packages" style="background:var(--paper-2);">
-    <div class="container">
-      <div class="section-head">
-        <h2 data-i18n data-ar="باقات الاشتراك" data-en="Subscription Packages"></h2>
-        <p data-i18n data-ar="دوسي اشتراك وهيتفتح واتساب مباشرة مع مس. شيرهان" data-en="Tap Subscribe to open WhatsApp"></p>
-      </div>
-      <div class="grid grid-3" id="packages-grid">
-        <div class="empty-state" data-i18n data-ar="جاري تحميل الباقات..." data-en="Loading..."></div>
-      </div>
-    </div>
-  </section>
+  <section class="block" id="packages" style="background:var(--paper-2);"><div class="container">
+    <div class="section-head"><h2>باقات الاشتراك</h2></div>
+    <div class="grid grid-3" id="packages-grid"><div class="empty-state">جاري التحميل...</div></div>
+  </div></section>
 
-  <footer>
-    <div class="container">
-      <p><strong data-i18n data-ar="بسّطنا الإنجليزي" data-en="Basetna English"></strong> · <span data-i18n data-ar="بإشراف مس. شيرهان علي" data-en="Led by ms. sherehan ali"></span></p>
-    </div>
-  </footer>
+  <footer><div class="container"><p><strong>بسّطنا الإنجليزي</strong> · بإشراف مس. شيرهان علي</p></div></footer>
 
   <div class="overlay" id="auth-overlay">
     <div class="modal">
       <button class="close" onclick="closeAuthModal()">✕</button>
       <form id="login-form">
-        <h3 data-i18n data-ar="تسجيل الدخول" data-en="Log in"></h3>
-        <p class="sub" data-i18n data-ar="أهلاً بيك تاني 👋" data-en="Welcome back 👋"></p>
-        <div class="field">
-          <label data-i18n data-ar="البريد الإلكتروني / اسم المستخدم" data-en="Email / Username"></label>
-          <input type="text" id="li-username" required>
-        </div>
-        <div class="field">
-          <label data-i18n data-ar="كلمة المرور" data-en="Password"></label>
-          <input type="password" id="li-password" required>
-        </div>
+        <h3>تسجيل الدخول</h3>
+        <p class="sub">أهلاً بيك تاني 👋</p>
+        <div class="field"><label>البريد / اسم المستخدم</label><input type="text" id="li-username" required></div>
+        <div class="field"><label>كلمة المرور</label><input type="password" id="li-password" required></div>
         <div class="field" id="serial-field" hidden>
-          <label data-i18n data-ar="الرقم التسلسلي (للأونر / الدعم فقط)" data-en="Serial (owner/support only)"></label>
+          <label>الرقم التسلسلي</label>
           <input type="text" id="li-serial">
         </div>
-        <button class="btn btn-gold btn-block" type="submit" data-i18n data-ar="دخول" data-en="Log in"></button>
+        <button class="btn btn-gold btn-block" type="submit">دخول</button>
         <div class="form-msg" id="login-msg"></div>
       </form>
     </div>
   </div>
+
+  <div class="overlay" id="role-picker-overlay">
+    <div class="modal role-picker-modal">
+      <h3 style="text-align:center;">👋 أهلاً Yassen</h3>
+      <p class="sub" style="text-align:center;">اختار الواجهة اللي عايز تدخل بيها</p>
+      <div class="role-choice" onclick="pickRole('superadmin')">
+        <div class="role-choice-icon" style="background:linear-gradient(135deg,#B8860B,#8B6914)">👑</div>
+        <div class="role-choice-info">
+          <div class="role-choice-title">المدير الأعلى</div>
+          <div class="role-choice-desc">كل الصلاحيات: إدارة، حذف، إعدادات، رسائل</div>
+        </div>
+      </div>
+      <div class="role-choice" onclick="pickRole('support')">
+        <div class="role-choice-icon" style="background:linear-gradient(135deg,#7B1FA2,#4A148C)">🛠️</div>
+        <div class="role-choice-info">
+          <div class="role-choice-title">الدعم الفني</div>
+          <div class="role-choice-desc">الواجهة العادية للمتابعة والرد على الطلاب</div>
+        </div>
+      </div>
+      <button class="btn btn-ghost btn-block" style="margin-top:14px;" onclick="pickRole('logout')">↩️ تسجيل الخروج</button>
+    </div>
+  </div>
 </div>
 
-<!-- ================= OWNER / SUPPORT ================= -->
 <div id="view-owner" hidden>
   <div class="dash-shell">
     <aside class="sidebar">
       <div class="brand"><span class="mark">EN</span> بسّطنا الإنجليزي</div>
-      <a href="#" class="nav-link active" data-tab="overview" data-i18n data-ar="نظرة عامة" data-en="Overview"></a>
-      <a href="#" class="nav-link" data-tab="levels" data-i18n data-ar="المراحل الدراسية" data-en="Stages"></a>
-      <a href="#" class="nav-link" data-tab="courses" data-i18n data-ar="الكورسات" data-en="Courses"></a>
-      <a href="#" class="nav-link" data-tab="packages" data-i18n data-ar="الباقات" data-en="Packages"></a>
-      <a href="#" class="nav-link" data-tab="students" data-i18n data-ar="الطلاب والاشتراكات" data-en="Students"></a>
-      <a href="#" class="nav-link" data-tab="chats" data-i18n data-ar="💬 المحادثات" data-en="💬 Chats"></a>
-      <a href="#" class="nav-link" data-tab="inbox" data-i18n data-ar="📥 صندوق الرسائل" data-en="📥 Inbox"></a>
-      <a href="#" class="nav-link" data-tab="settings" data-i18n data-ar="الإعدادات" data-en="Settings"></a>
+      <div id="current-role-badge" class="role-badge" style="display:none;"></div>
+      <button id="role-toggle-btn" class="role-toggle-btn" style="display:none;" onclick="showRolePicker()">🔄 تبديل الواجهة</button>
+      <a href="#" class="nav-link active" data-tab="overview">نظرة عامة</a>
+      <a href="#" class="nav-link" data-tab="levels">المراحل الدراسية</a>
+      <a href="#" class="nav-link" data-tab="courses">الكورسات</a>
+      <a href="#" class="nav-link" data-tab="packages">الباقات</a>
+      <a href="#" class="nav-link" data-tab="students">الطلاب والاشتراكات</a>
+      <a href="#" class="nav-link" data-tab="chats">💬 المحادثات</a>
+      <a href="#" class="nav-link" data-tab="inbox">📥 صندوق الرسائل</a>
+      <a href="#" class="nav-link" data-tab="settings">الإعدادات</a>
       <button class="lang-switch" style="margin-top:10px;">English</button>
-      <a href="#" class="logout" data-i18n data-ar="تسجيل الخروج" data-en="Log out"></a>
+      <a href="#" class="logout">تسجيل الخروج</a>
     </aside>
 
     <main class="dash-main">
       <section class="tab-panel" id="panel-overview">
-        <div class="dash-head"><h1 data-i18n data-ar="أهلاً بيك 👋" data-en="Welcome back 👋"></h1></div>
+        <div class="dash-head"><h1>أهلاً بيك 👋</h1></div>
         <div class="kpi-row">
-          <div class="kpi"><div class="num" id="kpi-students">—</div><div class="label" data-i18n data-ar="إجمالي الطلاب" data-en="Total students"></div></div>
-          <div class="kpi"><div class="num" id="kpi-active">—</div><div class="label" data-i18n data-ar="اشتراكات فعّالة" data-en="Active subs"></div></div>
-          <div class="kpi"><div class="num" id="kpi-courses">—</div><div class="label" data-i18n data-ar="عدد الكورسات" data-en="Courses"></div></div>
-          <div class="kpi"><div class="num" id="kpi-levels">—</div><div class="label" data-i18n data-ar="المراحل الدراسية" data-en="Stages"></div></div>
+          <div class="kpi"><div class="num" id="kpi-students">—</div><div class="label">إجمالي الطلاب</div></div>
+          <div class="kpi"><div class="num" id="kpi-active">—</div><div class="label">اشتراكات فعّالة</div></div>
+          <div class="kpi"><div class="num" id="kpi-courses">—</div><div class="label">عدد الكورسات</div></div>
+          <div class="kpi"><div class="num" id="kpi-levels">—</div><div class="label">المراحل الدراسية</div></div>
         </div>
       </section>
 
       <section class="tab-panel" id="panel-levels" hidden>
-        <div class="dash-head"><h1 data-i18n data-ar="المراحل الدراسية" data-en="Stages"></h1>
-          <button class="btn btn-gold btn-sm" onclick="openLevelForm()" data-i18n data-ar="+ إضافة مرحلة" data-en="+ Add"></button></div>
+        <div class="dash-head"><h1>المراحل الدراسية</h1>
+          <button class="btn btn-gold btn-sm" onclick="openLevelForm()">+ إضافة مرحلة</button></div>
         <div class="table-wrap"><table><thead><tr>
-          <th data-i18n data-ar="الاسم (عربي)" data-en="Arabic"></th>
-          <th data-i18n data-ar="Name (English)" data-en="English"></th>
-          <th data-i18n data-ar="الترتيب" data-en="Order"></th>
-          <th data-i18n data-ar="إجراءات" data-en="Actions"></th>
+          <th>الاسم (عربي)</th><th>Name (English)</th><th>الترتيب</th><th>إجراءات</th>
         </tr></thead><tbody id="levels-table"></tbody></table></div>
       </section>
 
       <section class="tab-panel" id="panel-courses" hidden>
-        <div class="dash-head"><h1 data-i18n data-ar="الكورسات" data-en="Courses"></h1>
-          <button class="btn btn-gold btn-sm" onclick="openCourseForm()" data-i18n data-ar="+ إضافة كورس" data-en="+ Add"></button></div>
+        <div class="dash-head"><h1>الكورسات</h1>
+          <button class="btn btn-gold btn-sm" onclick="openCourseForm()">+ إضافة كورس</button></div>
         <div class="table-wrap"><table><thead><tr>
-          <th data-i18n data-ar="الكورس" data-en="Course"></th>
-          <th data-i18n data-ar="المرحلة" data-en="Stage"></th>
-          <th data-i18n data-ar="النوع" data-en="Type"></th>
-          <th data-i18n data-ar="إجراءات" data-en="Actions"></th>
+          <th>الكورس</th><th>المرحلة</th><th>النوع</th><th>إجراءات</th>
         </tr></thead><tbody id="courses-table"></tbody></table></div>
       </section>
 
       <section class="tab-panel" id="panel-packages" hidden>
-        <div class="dash-head"><h1 data-i18n data-ar="الباقات" data-en="Packages"></h1>
-          <button class="btn btn-gold btn-sm" onclick="openPackageForm()" data-i18n data-ar="+ إضافة باقة" data-en="+ Add"></button></div>
+        <div class="dash-head"><h1>الباقات</h1>
+          <button class="btn btn-gold btn-sm" onclick="openPackageForm()">+ إضافة باقة</button></div>
         <div class="table-wrap"><table><thead><tr>
-          <th data-i18n data-ar="اسم الباقة" data-en="Name"></th>
-          <th data-i18n data-ar="المرحلة" data-en="Stage"></th>
-          <th data-i18n data-ar="السعر" data-en="Price"></th>
-          <th data-i18n data-ar="المدة" data-en="Duration"></th>
-          <th data-i18n data-ar="إجراءات" data-en="Actions"></th>
+          <th>اسم الباقة</th><th>المرحلة</th><th>السعر</th><th>المدة</th><th>إجراءات</th>
         </tr></thead><tbody id="packages-table"></tbody></table></div>
       </section>
 
       <section class="tab-panel" id="panel-students" hidden>
-        <div class="dash-head"><h1 data-i18n data-ar="الطلاب والاشتراكات" data-en="Students"></h1>
-          <button class="btn btn-gold btn-sm" onclick="openAddStudentForm()" data-i18n data-ar="+ إضافة حساب طالب" data-en="+ Add student"></button></div>
+        <div class="dash-head"><h1>الطلاب والاشتراكات</h1>
+          <button class="btn btn-gold btn-sm" onclick="openAddStudentForm()">+ إضافة حساب طالب</button></div>
         <div class="table-wrap"><table><thead><tr>
-          <th data-i18n data-ar="اسم الطالب" data-en="Student"></th>
-          <th data-i18n data-ar="الهاتف" data-en="Phone"></th>
-          <th data-i18n data-ar="المرحلة" data-en="Stage"></th>
-          <th data-i18n data-ar="حالة الاشتراك" data-en="Status"></th>
-          <th data-i18n data-ar="ينتهي في" data-en="Expires"></th>
-          <th data-i18n data-ar="إجراءات" data-en="Actions"></th>
+          <th>اسم الطالب</th><th>الهاتف</th><th>المرحلة</th><th>الحالة</th><th>ينتهي في</th><th>إجراءات</th>
         </tr></thead><tbody id="students-table"></tbody></table></div>
       </section>
 
       <section class="tab-panel" id="panel-chats" hidden>
-        <div class="dash-head">
-          <h1 data-i18n data-ar="💬 المحادثات" data-en="💬 Chats"></h1>
-          <button class="btn btn-gold btn-sm" onclick="loadChatsPanel()" data-i18n data-ar="🔄 تحديث" data-en="🔄 Refresh"></button>
-        </div>
-        <div id="chats-list"><div class="empty-state">جاري تحميل جهات الاتصال...</div></div>
+        <div class="dash-head"><h1>💬 المحادثات</h1>
+          <button class="btn btn-gold btn-sm" onclick="loadChatsPanel()">🔄 تحديث</button></div>
+        <div id="chats-list"><div class="empty-state">جاري التحميل...</div></div>
       </section>
 
       <section class="tab-panel" id="panel-inbox" hidden>
-        <div class="dash-head">
-          <h1 data-i18n data-ar="📥 صندوق الرسائل" data-en="📥 Inbox"></h1>
-          <button class="btn btn-gold btn-sm" onclick="loadAdminInbox()" data-i18n data-ar="🔄 تحديث" data-en="🔄 Refresh"></button>
-        </div>
+        <div class="dash-head"><h1>📥 صندوق الرسائل</h1>
+          <button class="btn btn-gold btn-sm" onclick="loadAdminInbox()">🔄 تحديث</button></div>
         <div id="inbox-list"><div class="empty-state">جاري التحميل...</div></div>
       </section>
 
       <section class="tab-panel" id="panel-settings" hidden>
-        <div class="dash-head"><h1 data-i18n data-ar="الإعدادات" data-en="Settings"></h1></div>
+        <div class="dash-head"><h1>الإعدادات</h1></div>
         <div class="card" style="max-width:520px;">
           <form id="settings-form">
-            <div class="field">
-              <label data-i18n data-ar="اسم الأونر" data-en="Owner name"></label>
-              <input type="text" id="set-owner-name" value="ms. sherehan ali">
-            </div>
-            <div class="field">
-              <label data-i18n data-ar="رقم واتساب (اختاري الدولة واكتبي الرقم بس)" data-en="WhatsApp"></label>
+            <div class="field"><label>اسم الأونر</label><input type="text" id="set-owner-name" value="ms. sherehan ali"></div>
+            <div class="field"><label>رقم واتساب</label>
               <div class="phone-row">
                 <select id="set-country"></select>
-                <input type="text" id="set-whatsapp" inputmode="numeric" placeholder="10XXXXXXXX" autocomplete="off">
-              </div>
-              <small style="color:var(--ink-soft);font-size:12.5px;display:block;margin-top:6px;">
-                مثال: اختاري مصر واكتبي <b>1012345678</b>
-              </small>
-            </div>
-            <button class="btn btn-teal" type="submit" data-i18n data-ar="حفظ" data-en="Save"></button>
+                <input type="text" id="set-whatsapp" inputmode="numeric" placeholder="10XXXXXXXX">
+              </div></div>
+            <button class="btn btn-teal" type="submit">حفظ</button>
           </form>
         </div>
       </section>
     </main>
   </div>
-
   <div class="overlay" id="form-overlay"><div class="modal" id="form-modal-content"></div></div>
 </div>
 
-<!-- ================= STUDENT ================= -->
 <div id="view-student" hidden>
   <div class="dash-shell">
     <aside class="sidebar">
       <div class="brand"><span class="mark">EN</span> بسّطنا الإنجليزي</div>
-      <a href="#" class="active" data-i18n data-ar="كورساتي" data-en="My courses"></a>
+      <a href="#" class="active">كورساتي</a>
       <button class="lang-switch" style="margin-top:10px;">English</button>
-      <a href="#" class="logout" data-i18n data-ar="تسجيل الخروج" data-en="Log out"></a>
+      <a href="#" class="logout">تسجيل الخروج</a>
     </aside>
     <main class="dash-main">
       <div class="dash-head">
-        <h1 id="welcome-msg" data-i18n data-ar="أهلاً بيك 👋" data-en="Welcome 👋"></h1>
+        <h1 id="welcome-msg">أهلاً بيك 👋</h1>
         <span class="badge" id="sub-badge">—</span>
       </div>
       <div id="no-sub-notice" class="card" style="display:none; margin-bottom:24px; border-top:4px solid var(--danger);">
-        <p style="margin:0 0 12px;" data-i18n
-          data-ar="مفيش اشتراك فعّال على حسابك دلوقتي. تواصلي مع مس. شيرهان."
-          data-en="No active subscription. Contact ms. sherehan."></p>
-        <a href="#" id="no-sub-wa-btn" class="btn btn-teal" target="_blank" data-i18n data-ar="تواصل على واتساب" data-en="Contact WhatsApp"></a>
+        <p style="margin:0 0 12px;">مفيش اشتراك فعّال. تواصلي مع مس. شيرهان.</p>
+        <a href="#" id="no-sub-wa-btn" class="btn btn-teal" target="_blank">تواصل على واتساب</a>
       </div>
       <div class="grid grid-3" id="courses-grid"></div>
     </main>
   </div>
 </div>
 
-<!-- ================= SUPPORT FABs ================= -->
 <div class="support-fabs" id="support-fabs">
-  <button class="support-fab support-fab-general" onclick="openSupportPanel('general')" title="الغرفة العامة">
-    <span>💬</span>
-    <span class="fab-label" data-i18n data-ar="عام" data-en="General"></span>
-  </button>
-  <button class="support-fab support-fab-owner" onclick="openSupportPanel('owner')" title="مس. شيرهان علي">
-    <span>👩‍🏫</span>
-    <span class="fab-label" data-i18n data-ar="الميس" data-en="Teacher"></span>
-  </button>
-  <button class="support-fab support-fab-support" onclick="openSupportPanel('support')" title="الدعم الفني">
-    <span>🛠️</span>
-    <span class="fab-label" data-i18n data-ar="دعم فني" data-en="Support"></span>
-  </button>
+  <button class="support-fab support-fab-general" onclick="openSupportPanel('general')"><span>💬</span><span class="fab-label">عام</span></button>
+  <button class="support-fab support-fab-owner" onclick="openSupportPanel('owner')"><span>👩‍🏫</span><span class="fab-label">الميس</span></button>
+  <button class="support-fab support-fab-support" onclick="openSupportPanel('support')"><span>🛠️</span><span class="fab-label">دعم فني</span></button>
 </div>
 
-<!-- ================= SUPPORT MODAL ================= -->
 <div class="overlay" id="support-overlay">
   <div class="support-modal">
     <button class="close" id="support-close">✕</button>
@@ -279,8 +230,8 @@
   </div>
 </div>
 
-<a href="#" id="wa-float" class="wa-float" target="_blank" rel="noopener" title="واتساب">
-  <svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5-1.3c1.4.8 3.1 1.3 5 1.3 5.5 0 10-4.5 10-10S17.5 2 12 2zm0 18c-1.6 0-3.1-.4-4.4-1.2l-.3-.2-3 .8.8-2.9-.2-.3C4.4 15 4 13.6 4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8zm4.4-6c-.2-.1-1.4-.7-1.7-.8-.2-.1-.4-.1-.6.1s-.6.8-.8 1c-.1.2-.3.2-.5.1-.2-.1-1-.4-1.9-1.2-.7-.6-1.2-1.4-1.3-1.6-.1-.2 0-.4.1-.5.1-.1.2-.3.4-.4.1-.1.2-.2.2-.4.1-.1 0-.3 0-.4-.1-.1-.6-1.4-.8-1.9-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 1.9s.8 2.2.9 2.4c.1.2 1.6 2.5 3.9 3.5.5.2.9.4 1.3.5.5.2 1 .1 1.4.1.4-.1 1.4-.6 1.6-1.1.2-.6.2-1 .1-1.1-.1-.1-.2-.2-.4-.3z"/></svg>
+<a href="#" id="wa-float" class="wa-float" target="_blank" rel="noopener">
+  <svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5-1.3c1.4.8 3.1 1.3 5 1.3 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg>
 </a>
 
 <script src="app.js"></script>

@@ -1,7 +1,7 @@
 /* ============================================================
-   بسّطنا الإنجليزي — app.js v14
-   - ياسين superadmin
-   - إصلاح ظهور الرسايل للدعم
+   بسّطنا الإنجليزي — app.js v15
+   - Role Picker لياسين
+   - superadmin فوق الميس
    - رفع فيديو من الموبايل
    ============================================================ */
 (function(){
@@ -29,7 +29,9 @@ const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_
 let CURRENT_LEVELS = [];
 let CURRENT_PROFILE = null;
 let ALL_CONTACTS = [];
+let VIEW_MODE = localStorage.getItem("basetna_view_mode") || null;
 
+/* Toast */
 function ensureToastEl(){let el=document.getElementById("global-toast");if(!el){el=document.createElement("div");el.id="global-toast";el.className="global-toast";document.body.appendChild(el);}return el;}
 function showToast(msg,type="error",duration=6000){const el=ensureToastEl();el.className="global-toast show "+type;el.textContent=msg;clearTimeout(window.__toastTimer);window.__toastTimer=setTimeout(()=>el.classList.remove("show"),duration);}
 function friendlyError(err){
@@ -97,9 +99,81 @@ function showView(view){
   document.getElementById("view-owner").hidden=view!=="owner";
   document.getElementById("view-student").hidden=view!=="student";
 }
-function hideSupportFabsForRole(){}
+function hideSupportFabsForRole(){document.querySelectorAll(".support-fab").forEach(b=>{b.style.display="flex";});}
 function showMsg(el,text,type){el.textContent=text;el.className="form-msg "+type;}
 
+/* ============================================================
+   🎭 Role Picker (ياسين)
+   ============================================================ */
+function showRolePicker(){
+  if(!CURRENT_PROFILE) return;
+  document.getElementById("role-picker-overlay").classList.add("open");
+}
+window.showRolePicker = showRolePicker;
+
+function pickRole(role){
+  document.getElementById("role-picker-overlay").classList.remove("open");
+  if(role === "logout"){
+    localStorage.removeItem("basetna_view_mode");
+    logout();
+    return;
+  }
+  VIEW_MODE = role;
+  localStorage.setItem("basetna_view_mode", role);
+  showToast(role === "superadmin" ? "👑 تم التبديل لواجهة المدير" : "🛠️ تم التبديل لواجهة الدعم", "ok", 2000);
+  setTimeout(() => window.location.reload(), 600);
+}
+window.pickRole = pickRole;
+
+function applyRoleMode(){
+  const isYassen = CURRENT_PROFILE && (
+    CURRENT_PROFILE.full_name.includes("Yassen") ||
+    CURRENT_PROFILE.full_name.includes("ياسين")
+  );
+  if(isYassen && VIEW_MODE){
+    CURRENT_PROFILE.effectiveRole = VIEW_MODE;
+  } else {
+    CURRENT_PROFILE.effectiveRole = CURRENT_PROFILE.role;
+  }
+  updateRoleUI();
+}
+
+function updateRoleUI(){
+  const role = CURRENT_PROFILE?.effectiveRole || CURRENT_PROFILE?.role;
+  const badge = document.getElementById("current-role-badge");
+  const toggleBtn = document.getElementById("role-toggle-btn");
+  const isYassen = CURRENT_PROFILE && (
+    CURRENT_PROFILE.full_name.includes("Yassen") ||
+    CURRENT_PROFILE.full_name.includes("ياسين")
+  );
+
+  if(badge){
+    if(role === "superadmin"){
+      badge.className = "role-badge superadmin";
+      badge.innerHTML = "👑 المدير الأعلى";
+      badge.style.display = "inline-flex";
+    } else if(role === "support"){
+      badge.className = "role-badge support";
+      badge.innerHTML = "🛠️ الدعم الفني";
+      badge.style.display = "inline-flex";
+    } else {
+      badge.style.display = "none";
+    }
+  }
+
+  if(toggleBtn){
+    if(isYassen){
+      toggleBtn.style.display = "flex";
+      toggleBtn.textContent = role === "superadmin"
+        ? "🛠️ التبديل لواجهة الدعم"
+        : "👑 التبديل لواجهة المدير";
+    } else {
+      toggleBtn.style.display = "none";
+    }
+  }
+}
+
+/* Auth */
 async function handleLogin(e){
   e.preventDefault();
   const msg=document.getElementById("login-msg");
@@ -129,7 +203,7 @@ async function logout(e){
   if(e?.stopPropagation)e.stopPropagation();
   try{await supabaseClient.auth.signOut({scope:"global"});}catch(err){console.error(err);}
   try{
-    Object.keys(localStorage).forEach(k=>{if(k.startsWith("sb-")||k.includes("supabase")||k.startsWith("temp-create-"))localStorage.removeItem(k);});
+    Object.keys(localStorage).forEach(k=>{if(k.startsWith("sb-")||k.includes("supabase")||k.startsWith("temp-create-")||k==="basetna_view_mode")localStorage.removeItem(k);});
     sessionStorage.clear();
   }catch(_){}
   showToast("✅ تم تسجيل الخروج","ok",1200);
@@ -137,6 +211,7 @@ async function logout(e){
 }
 window.logout=logout;
 
+/* WhatsApp */
 async function getWhatsAppNumber(){
   const {data,error}=await supabaseClient.from("settings").select("whatsapp_number").eq("id",1).maybeSingle();
   if(error){logError("جلب رقم الواتساب",error);return null;}
@@ -171,15 +246,13 @@ async function loadHome(){
   document.getElementById("stat-courses").textContent=courseCount;
   document.getElementById("levels-grid").innerHTML=levels.length
     ?levels.map((lv,i)=>`<div class="card level-card"><div class="lv-num">${i+1}</div><h3>${lang==="ar"?lv.name_ar:lv.name_en}</h3></div>`).join("")
-    :`<div class="empty-state">${lang==="ar"?"لسه مفيش مراحل":"No stages yet"}</div>`;
+    :`<div class="empty-state">لسه مفيش مراحل</div>`;
   document.getElementById("packages-grid").innerHTML=packages.length
-    ?packages.map(p=>`<div class="card pkg-card"><h3>${lang==="ar"?p.name_ar:p.name_en}</h3><div class="price">${p.price} <small>${lang==="ar"?"ج.م / "+p.duration_days+" يوم":"EGP / "+p.duration_days+" days"}</small></div><p class="desc">${(lang==="ar"?p.description_ar:p.description_en)||""}</p><button class="btn btn-teal btn-block" onclick='subscribeViaWhatsApp(${JSON.stringify(lang==="ar"?p.name_ar:p.name_en)})'>${lang==="ar"?"اشترك عبر واتساب":"Subscribe"}</button></div>`).join("")
-    :`<div class="empty-state">${lang==="ar"?"لسه مفيش باقات":"No packages yet"}</div>`;
+    ?packages.map(p=>`<div class="card pkg-card"><h3>${lang==="ar"?p.name_ar:p.name_en}</h3><div class="price">${p.price} <small>${lang==="ar"?"ج.م / "+p.duration_days+" يوم":"EGP / "+p.duration_days+" days"}</small></div><p class="desc">${(lang==="ar"?p.description_ar:p.description_en)||""}</p><button class="btn btn-teal btn-block" onclick='subscribeViaWhatsApp(${JSON.stringify(lang==="ar"?p.name_ar:p.name_en)})'>اشترك</button></div>`).join("")
+    :`<div class="empty-state">لسه مفيش باقات</div>`;
 }
 
-/* ============================================================
-   الدعم الفني + المحادثات
-   ============================================================ */
+/* Support */
 function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 async function openSupportPanel(recipientRole="support"){
@@ -190,13 +263,12 @@ async function openSupportPanel(recipientRole="support"){
   delete overlay.dataset.privateWith;
   const title=document.getElementById("support-title");
   const sub=document.getElementById("support-subtitle");
-  const lang=localStorage.getItem("basetna_lang")||"ar";
   const membersBox=document.getElementById("support-members");
   const banner=document.getElementById("private-banner");
   if(banner)banner.hidden=true;
-  if(recipientRole==="support"){title.textContent="🛠️ الدعم الفني";sub.textContent=lang==="ar"?"الدعم الفني للمنصة":"Platform support";}
-  else if(recipientRole==="owner"){title.textContent="👩‍🏫 مس. شيرهان علي";sub.textContent=lang==="ar"?"تواصلي مع الميس مباشرة":"Chat with ms. sherehan";}
-  else{title.textContent="💬 الغرفة العامة";sub.textContent=lang==="ar"?"كل الطلاب والميس والدعم":"Everyone can see";}
+  if(recipientRole==="support"){title.textContent="🛠️ الدعم الفني";sub.textContent="الدعم الفني للمنصة";}
+  else if(recipientRole==="owner"){title.textContent="👩‍🏫 مس. شيرهان علي";sub.textContent="تواصلي مع الميس مباشرة";}
+  else{title.textContent="💬 الغرفة العامة";sub.textContent="كل الطلاب والميس والدعم";}
   if(membersBox){
     if(recipientRole==="general"){membersBox.hidden=false;await renderGroupMembers();}
     else{membersBox.hidden=true;}
@@ -205,40 +277,19 @@ async function openSupportPanel(recipientRole="support"){
 }
 function closeSupportPanel(){document.getElementById("support-overlay").classList.remove("open");}
 
-/* ============================================================
-   ⭐ إصلاح: تحميل الرسايل للأدمن (كل الرسايل)
-   ============================================================ */
 async function loadMessages(recipientRole){
-  const list = document.getElementById("support-messages");
-  const lang = localStorage.getItem("basetna_lang") || "ar";
-  list.innerHTML = `<div class="empty-state">${lang === "en" ? "Loading..." : "جاري التحميل..."}</div>`;
-
-  let query = supabaseClient.from("messages").select("*").order("created_at", { ascending: true }).limit(500);
-
-  const isAdmin = ADMIN_ROLES.includes(CURRENT_PROFILE.role);
-
-  if (recipientRole === "general"){
-    // الغرفة العامة: كل الرسايل العامة
-    query = query.eq("recipient_role", "general");
-  } else if (recipientRole === "private"){
-    // محادثة خاصة: بتتعامل معاها دالة تانية
-    query = query.eq("recipient_role", "private");
-  } else if (isAdmin){
-    // ⭐ الأدمن يشوف كل الرسايل الموجّهة للـrole ده من أي حد
-    query = query.eq("recipient_role", recipientRole);
-  } else {
-    // المستخدم العادي: رسايله هو + الرسايل الموجهة للـrole بتاعه
-    query = query.or(`sender_id.eq.${CURRENT_PROFILE.id},recipient_role.eq.${recipientRole}`);
-  }
-
-  const { data, error } = await query;
-  if (error){ logError("تحميل الرسائل", error); return; }
-
-  if (!data || !data.length){
-    list.innerHTML = `<div class="empty-state">${lang === "en" ? "No messages yet 👋" : "لسه مفيش رسائل 👋"}</div>`;
-    return;
-  }
-  renderMessages(data, recipientRole);
+  const list=document.getElementById("support-messages");
+  list.innerHTML=`<div class="empty-state">جاري التحميل...</div>`;
+  let query=supabaseClient.from("messages").select("*").order("created_at",{ascending:true}).limit(500);
+  const isAdmin=ADMIN_ROLES.includes(CURRENT_PROFILE.role);
+  if(recipientRole==="general"){query=query.eq("recipient_role","general");}
+  else if(recipientRole==="private"){query=query.eq("recipient_role","private");}
+  else if(isAdmin){query=query.eq("recipient_role",recipientRole);}
+  else{query=query.or(`sender_id.eq.${CURRENT_PROFILE.id},recipient_role.eq.${recipientRole}`);}
+  const {data,error}=await query;
+  if(error){logError("تحميل الرسائل",error);return;}
+  if(!data||!data.length){list.innerHTML=`<div class="empty-state">لسه مفيش رسائل 👋</div>`;return;}
+  renderMessages(data);
   scrollMessagesToBottom();
 }
 
@@ -250,7 +301,7 @@ function renderMessages(messages){
     const isAdminMsg=ADMIN_ROLES.includes(m.sender_role);
     const time=new Date(m.created_at).toLocaleString(lang==="ar"?"ar-EG":"en-US",{hour:"2-digit",minute:"2-digit",day:"2-digit",month:"2-digit"});
     const avatarEmoji=m.sender_role==="superadmin"?"👑":m.sender_role==="owner"?"👩‍🏫":m.sender_role==="support"?"🛠️":"🎓";
-    const roleName=m.sender_role==="superadmin"?(lang==="ar"?"👑 المدير الأعلى":"👑 Super Admin"):m.sender_role==="owner"?(lang==="ar"?"الميس":"Teacher"):m.sender_role==="support"?(lang==="ar"?"دعم فني":"Support"):(lang==="ar"?"طالب":"Student");
+    const roleName=m.sender_role==="superadmin"?"👑 المدير الأعلى":m.sender_role==="owner"?"الميس":m.sender_role==="support"?"دعم فني":"طالب";
     return `<div class="msg ${isMine?"mine":""} ${isAdminMsg?"admin-msg":""}">${!isMine?`<div class="msg-avatar">${avatarEmoji}</div>`:""}<div class="msg-bubble">${!isMine?`<div class="msg-name">${escapeHtml(m.sender_name)} <span class="role-tag">${roleName}</span></div>`:""}<div class="msg-text">${escapeHtml(m.content)}</div><div class="msg-time">${time}</div></div></div>`;
   }).join("");
 }
@@ -259,7 +310,7 @@ function scrollMessagesToBottom(){const list=document.getElementById("support-me
 async function renderGroupMembers(){
   const container=document.getElementById("support-members");
   if(!container)return;
-  container.innerHTML=`<div class="empty-state" style="padding:10px;font-size:12.5px;">جاري تحميل الأعضاء...</div>`;
+  container.innerHTML=`<div class="empty-state" style="padding:10px;font-size:12.5px;">جاري التحميل...</div>`;
   const {data,error}=await supabaseClient.from("profiles").select("id, full_name, role").neq("id",CURRENT_PROFILE.id).order("role",{ascending:true});
   if(error){logError("تحميل الأعضاء",error);container.innerHTML="";return;}
   const roleLabel=(r)=>r==="superadmin"?"👑 المدير":r==="owner"?"الميس":r==="support"?"دعم فني":"طالب";
@@ -426,7 +477,7 @@ function openLevelForm(level){
     const q=isEdit?supabaseClient.from("grade_levels").update(payload).eq("id",level.id):supabaseClient.from("grade_levels").insert(payload);
     const {error}=await q;
     if(error){showMsg(msg,friendlyError(error),"error");return;}
-    logOk("المرحلة",isEdit?"تم التعديل ✏️":"تمت الإضافة ➕");
+    logOk("المرحلة",isEdit?"تم التعديل":"تمت الإضافة");
     closeFormModal();await loadLevels();await loadKpis();
   });
 }
@@ -461,8 +512,8 @@ function openCourseForm(course){
       <div class="field"><label>Short description (English)</label><textarea id="cr-desc-en" rows="2">${course?.description_en||""}</textarea></div>
       <div class="field"><label>نوع المحتوى</label>
         <select id="cr-type">
-          <option value="file" ${course?.content_type==="file"?"selected":""}>📱 رفع من الموبايل (فيديو/ملف)</option>
-          <option value="link" ${course?.content_type==="link"?"selected":""}>🔗 رابط (YouTube / Drive)</option>
+          <option value="file" ${course?.content_type==="file"?"selected":""}>📱 رفع من الموبايل</option>
+          <option value="link" ${course?.content_type==="link"?"selected":""}>🔗 رابط خارجي</option>
         </select></div>
       <div class="field" id="cr-file-field">
         <label>🎬 اختار من الفيديوهات / الملفات</label>
@@ -517,7 +568,7 @@ function openCourseForm(course){
     const q=course?supabaseClient.from("courses").update(payload).eq("id",course.id):supabaseClient.from("courses").insert(payload);
     const {error}=await q;
     if(error){showMsg(msg,"❌ "+friendlyError(error),"error");return;}
-    logOk("الكورس",course?"تم التعديل ✏️":"تمت الإضافة ➕");
+    logOk("الكورس",course?"تم التعديل":"تمت الإضافة");
     closeFormModal();await loadCourses();await loadKpis();
   });
 }
@@ -541,7 +592,7 @@ function openPackageForm(pkg){
     const q=pkg?supabaseClient.from("packages").update(payload).eq("id",pkg.id):supabaseClient.from("packages").insert(payload);
     const {error}=await q;
     if(error){showMsg(msg,friendlyError(error),"error");return;}
-    logOk("الباقة",pkg?"تم التعديل ✏️":"تمت الإضافة ➕");
+    logOk("الباقة",pkg?"تم التعديل":"تمت الإضافة");
     closeFormModal();await loadPackages();await loadKpis();
   });
 }
@@ -676,20 +727,20 @@ function buildCourseCard(course,lang){
     targetUrl=video.watchUrl;
     const ytId=getYouTubeId(course.content_url);
     thumbHTML=`<a class="course-thumb" href="${targetUrl}" target="_blank" rel="noopener"><img src="${video.thumbnail}" alt="${title}" loading="lazy" onerror="this.onerror=null;this.src='https://img.youtube.com/vi/${ytId}/mqdefault.jpg';"><div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div><span class="video-badge">▶ فيديو</span></a>`;
-    actionLabel=lang==="ar"?"▶️ مشاهدة الفيديو":"▶️ Watch video";
+    actionLabel="▶️ مشاهدة الفيديو";
   }else if(video?.kind==="drive"){
     targetUrl=video.watchUrl;
     thumbHTML=`<a class="course-thumb" href="${targetUrl}" target="_blank" rel="noopener"><img src="${video.thumbnail}" alt="${title}" loading="lazy"><div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div><span class="video-badge">▶ فيديو</span></a>`;
-    actionLabel=lang==="ar"?"▶️ مشاهدة الفيديو":"▶️ Watch video";
+    actionLabel="▶️ مشاهدة الفيديو";
   }else if(video?.kind==="video-file"){
     thumbHTML=`<a class="course-thumb" href="${targetUrl}" target="_blank" rel="noopener"><video src="${targetUrl}#t=0.5" preload="metadata" muted playsinline></video><div class="play-overlay"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div><span class="video-badge">▶ فيديو</span></a>`;
-    actionLabel=lang==="ar"?"▶️ مشاهدة الفيديو":"▶️ Watch video";
+    actionLabel="▶️ مشاهدة الفيديو";
   }else if(isFile){
     thumbHTML=`<div class="course-thumb file-thumb"><div class="file-icon">📄</div><span class="video-badge" style="background:var(--teal);">ملف</span></div>`;
-    actionLabel=lang==="ar"?"⬇️ تحميل الملف":"⬇️ Download file";
+    actionLabel="⬇️ تحميل الملف";
   }else{
     thumbHTML=`<div class="course-thumb file-thumb"><div class="file-icon">🔗</div><span class="video-badge" style="background:var(--gold);">رابط</span></div>`;
-    actionLabel=lang==="ar"?"🔗 فتح الرابط":"🔗 Open link";
+    actionLabel="🔗 فتح الرابط";
   }
   return `<div class="card course-card">${thumbHTML}<div class="course-body"><h3>${title}</h3><p>${desc}</p><a class="btn btn-teal btn-block" href="${targetUrl}" target="_blank" rel="noopener" ${isFile&&!video?"download":""}>${actionLabel}</a></div></div>`;
 }
@@ -704,7 +755,7 @@ async function loadStudentDashboard(profile){
   const isActive=!!(latestSub&&latestSub.status==="active"&&endOfDay>=new Date());
   const badge=document.getElementById("sub-badge");
   badge.className="badge "+(isActive?"active":"expired");
-  badge.textContent=isActive?(lang==="ar"?"اشتراك فعّال حتى "+latestSub.end_date:"Active until "+latestSub.end_date):(lang==="ar"?"لا يوجد اشتراك فعّال":"No active subscription");
+  badge.textContent=isActive?("اشتراك فعّال حتى "+latestSub.end_date):"لا يوجد اشتراك فعّال";
   const notice=document.getElementById("no-sub-notice");
   const grid=document.getElementById("courses-grid");
   if(!isActive){
@@ -714,10 +765,10 @@ async function loadStudentDashboard(profile){
     return;
   }
   notice.style.display="none";
-  if(!profile.grade_level_id){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1;">${lang==="ar"?"محتاجة تحددي المرحلة":"Stage not set"}</div>`;return;}
+  if(!profile.grade_level_id){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1;">محتاجة تحددي المرحلة</div>`;return;}
   const {data:courses,error}=await supabaseClient.from("courses").select("*").eq("grade_level_id",profile.grade_level_id).order("sort_order");
   if(error){logError("تحميل كورسات الطالب",error);grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1;">⚠️ ${friendlyError(error)}</div>`;return;}
-  if(!courses||!courses.length){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1;">${lang==="ar"?"لسه مفيش كورسات لمرحلتك":"No courses yet"}</div>`;return;}
+  if(!courses||!courses.length){grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1;">لسه مفيش كورسات لمرحلتك</div>`;return;}
   grid.innerHTML=courses.map(c=>buildCourseCard(c,lang)).join("");
 }
 
@@ -729,21 +780,35 @@ async function initApp(){
   if(profRes.error){logError("تحميل البروفايل",profRes.error);showView("public");await loadHome();await wireWhatsAppButton();return;}
   if(!profRes.data){showToast("⚠️ حسابك موجود لكن مفيش بروفايل","error",8000);showView("public");await loadHome();await wireWhatsAppButton();return;}
   CURRENT_PROFILE=profRes.data;
-  if(ADMIN_ROLES.includes(CURRENT_PROFILE.role)){
+
+  const isYassen = CURRENT_PROFILE.full_name.includes("Yassen") || CURRENT_PROFILE.full_name.includes("ياسين");
+
+  if(isYassen && !VIEW_MODE){
+    showView("owner");
+    setTimeout(() => showRolePicker(), 400);
+    return;
+  }
+
+  applyRoleMode();
+  const effectiveRole = CURRENT_PROFILE.effectiveRole || CURRENT_PROFILE.role;
+
+  if(ADMIN_ROLES.includes(effectiveRole)){
     showView("owner");
     wireOwnerTabs();
-    hideSupportFabsForRole(CURRENT_PROFILE.role);
-    if(CURRENT_PROFILE.role==="superadmin"){
+    hideSupportFabsForRole(effectiveRole);
+    if(effectiveRole === "superadmin"){
       document.body.classList.add("is-superadmin");
-      document.title="👑 "+document.title;
+    } else {
+      document.body.classList.remove("is-superadmin");
     }
     await refreshOwnerData();
-  }else{
+  } else {
     showView("student");
     hideSupportFabsForRole("student");
     await loadStudentDashboard(CURRENT_PROFILE);
   }
   await wireWhatsAppButton();
+  updateRoleUI();
 }
 
 document.addEventListener("DOMContentLoaded",async()=>{

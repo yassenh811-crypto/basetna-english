@@ -11,6 +11,7 @@
 </head>
 <body>
 
+<!-- ==================== PUBLIC ==================== -->
 <div id="view-public">
   <div class="topbar">
     <div class="row">
@@ -55,7 +56,9 @@
     </div>
   </section>
 
-  <footer><div class="container"><p><strong>بسّطنا الإنجليزي</strong> · بإشراف مس. شيرهان علي</p></div></footer>
+  <footer><div class="container">
+    <p><strong>بسّطنا الإنجليزي</strong> · بإشراف مس. شيرهان علي</p>
+  </div></footer>
 
   <div class="overlay" id="auth-overlay">
     <div class="modal">
@@ -98,6 +101,7 @@
   </div>
 </div>
 
+<!-- ==================== OWNER / SUPPORT ==================== -->
 <div id="view-owner" hidden>
   <div class="dash-shell">
     <aside class="sidebar">
@@ -190,6 +194,7 @@
   <div class="overlay" id="form-overlay"><div class="modal" id="form-modal-content"></div></div>
 </div>
 
+<!-- ==================== STUDENT ==================== -->
 <div id="view-student" hidden>
   <div class="dash-shell">
     <aside class="sidebar">
@@ -212,12 +217,14 @@
   </div>
 </div>
 
+<!-- ==================== SUPPORT FABs ==================== -->
 <div class="support-fabs" id="support-fabs">
-  <button class="support-fab support-fab-general" onclick="openSupportPanel('general')"><span>💬</span><span class="fab-label">عام</span></button>
-  <button class="support-fab support-fab-owner" onclick="openSupportPanel('owner')"><span>👩‍🏫</span><span class="fab-label">الميس</span></button>
-  <button class="support-fab support-fab-support" onclick="openSupportPanel('support')"><span>🛠️</span><span class="fab-label">دعم فني</span></button>
+  <button class="support-fab support-fab-general" onclick="openSupportPanel('general')" title="الغرفة العامة"><span>💬</span><span class="fab-label">عام</span></button>
+  <button class="support-fab support-fab-owner" onclick="openSupportPanel('owner')" title="مس. شيرهان علي"><span>👩‍🏫</span><span class="fab-label">الميس</span></button>
+  <button class="support-fab support-fab-support" onclick="openSupportPanel('support')" title="الدعم الفني"><span>🛠️</span><span class="fab-label">دعم فني</span></button>
 </div>
 
+<!-- ==================== SUPPORT MODAL ==================== -->
 <div class="overlay" id="support-overlay">
   <div class="support-modal">
     <button class="close" id="support-close">✕</button>
@@ -238,7 +245,7 @@
   </div>
 </div>
 
-<a href="#" id="wa-float" class="wa-float" target="_blank" rel="noopener">
+<a href="#" id="wa-float" class="wa-float" target="_blank" rel="noopener" title="واتساب">
   <svg viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12c0 1.9.5 3.6 1.4 5.1L2 22l5-1.3c1.4.8 3.1 1.3 5 1.3 5.5 0 10-4.5 10-10S17.5 2 12 2z"/></svg>
 </a>
 

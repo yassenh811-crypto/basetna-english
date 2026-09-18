@@ -11,7 +11,6 @@
 </head>
 <body>
 
-<!-- ==================== PUBLIC ==================== -->
 <div id="view-public">
   <div class="topbar">
     <div class="row">
@@ -56,52 +55,52 @@
     </div>
   </section>
 
-  <footer><div class="container">
-    <p><strong>بسّطنا الإنجليزي</strong> · بإشراف مس. شيرهان علي</p>
-  </div></footer>
+  <footer><div class="container"><p><strong>بسّطنا الإنجليزي</strong> · بإشراف مس. شيرهان علي</p></div></footer>
+</div>
 
-  <div class="overlay" id="auth-overlay">
-    <div class="modal">
-      <button class="close" onclick="closeAuthModal()">✕</button>
-      <form id="login-form">
-        <h3>تسجيل الدخول</h3>
-        <p class="sub">أهلاً بيك تاني 👋</p>
-        <div class="field"><label>البريد / اسم المستخدم</label><input type="text" id="li-username" required></div>
-        <div class="field"><label>كلمة المرور</label><input type="password" id="li-password" required></div>
-        <div class="field" id="serial-field" hidden>
-          <label>الرقم التسلسلي</label>
-          <input type="text" id="li-serial">
-        </div>
-        <button class="btn btn-gold btn-block" type="submit">دخول</button>
-        <div class="form-msg" id="login-msg"></div>
-      </form>
-    </div>
-  </div>
-
-  <div class="overlay" id="role-picker-overlay">
-    <div class="modal role-picker-modal">
-      <h3 style="text-align:center;">👋 أهلاً Yassen</h3>
-      <p class="sub" style="text-align:center;">اختار الواجهة اللي عايز تدخل بيها</p>
-      <div class="role-choice" onclick="pickRole('superadmin')">
-        <div class="role-choice-icon" style="background:linear-gradient(135deg,#B8860B,#8B6914)">👑</div>
-        <div class="role-choice-info">
-          <div class="role-choice-title">المدير الأعلى</div>
-          <div class="role-choice-desc">كل الصلاحيات: إدارة، حذف، إعدادات، رسائل</div>
-        </div>
+<!-- Role Picker Modal -->
+<div class="overlay" id="role-picker-overlay">
+  <div class="modal role-picker-modal">
+    <h3 style="text-align:center;">👋 أهلاً Yassen</h3>
+    <p class="sub" style="text-align:center;">اختار الواجهة اللي عايز تدخل بيها</p>
+    <div class="role-choice" onclick="pickRole('superadmin')">
+      <div class="role-choice-icon" style="background:linear-gradient(135deg,#B8860B,#8B6914)">👑</div>
+      <div class="role-choice-info">
+        <div class="role-choice-title">المدير الأعلى</div>
+        <div class="role-choice-desc">كل الصلاحيات: إدارة، حذف، إعدادات، رسائل</div>
       </div>
-      <div class="role-choice" onclick="pickRole('support')">
-        <div class="role-choice-icon" style="background:linear-gradient(135deg,#7B1FA2,#4A148C)">🛠️</div>
-        <div class="role-choice-info">
-          <div class="role-choice-title">الدعم الفني</div>
-          <div class="role-choice-desc">الواجهة العادية للمتابعة والرد على الطلاب</div>
-        </div>
-      </div>
-      <button class="btn btn-ghost btn-block" style="margin-top:14px;" onclick="pickRole('logout')">↩️ تسجيل الخروج</button>
     </div>
+    <div class="role-choice" onclick="pickRole('support')">
+      <div class="role-choice-icon" style="background:linear-gradient(135deg,#7B1FA2,#4A148C)">🛠️</div>
+      <div class="role-choice-info">
+        <div class="role-choice-title">الدعم الفني</div>
+        <div class="role-choice-desc">الواجهة العادية للمتابعة والرد على الطلاب</div>
+      </div>
+    </div>
+    <button class="btn btn-ghost btn-block" style="margin-top:14px;" onclick="pickRole('logout')">↩️ تسجيل الخروج</button>
   </div>
 </div>
 
-<!-- ==================== OWNER / SUPPORT ==================== -->
+<!-- Auth Modal -->
+<div class="overlay" id="auth-overlay">
+  <div class="modal">
+    <button class="close" onclick="closeAuthModal()">✕</button>
+    <form id="login-form">
+      <h3>تسجيل الدخول</h3>
+      <p class="sub">أهلاً بيك تاني 👋</p>
+      <div class="field"><label>البريد / اسم المستخدم</label><input type="text" id="li-username" autocomplete="username" required></div>
+      <div class="field"><label>كلمة المرور</label><input type="password" id="li-password" autocomplete="current-password" required></div>
+      <div class="field" id="serial-field" hidden>
+        <label>الرقم التسلسلي</label>
+        <input type="text" id="li-serial">
+      </div>
+      <button class="btn btn-gold btn-block" type="submit">دخول</button>
+      <div class="form-msg" id="login-msg"></div>
+    </form>
+  </div>
+</div>
+
+<!-- Owner / Support Dashboard -->
 <div id="view-owner" hidden>
   <div class="dash-shell">
     <aside class="sidebar">
@@ -194,7 +193,7 @@
   <div class="overlay" id="form-overlay"><div class="modal" id="form-modal-content"></div></div>
 </div>
 
-<!-- ==================== STUDENT ==================== -->
+<!-- Student Dashboard -->
 <div id="view-student" hidden>
   <div class="dash-shell">
     <aside class="sidebar">
@@ -217,14 +216,14 @@
   </div>
 </div>
 
-<!-- ==================== SUPPORT FABs ==================== -->
+<!-- Support FABs -->
 <div class="support-fabs" id="support-fabs">
   <button class="support-fab support-fab-general" onclick="openSupportPanel('general')" title="الغرفة العامة"><span>💬</span><span class="fab-label">عام</span></button>
   <button class="support-fab support-fab-owner" onclick="openSupportPanel('owner')" title="مس. شيرهان علي"><span>👩‍🏫</span><span class="fab-label">الميس</span></button>
   <button class="support-fab support-fab-support" onclick="openSupportPanel('support')" title="الدعم الفني"><span>🛠️</span><span class="fab-label">دعم فني</span></button>
 </div>
 
-<!-- ==================== SUPPORT MODAL ==================== -->
+<!-- Support Chat Modal -->
 <div class="overlay" id="support-overlay">
   <div class="support-modal">
     <button class="close" id="support-close">✕</button>

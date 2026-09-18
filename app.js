@@ -1,5 +1,5 @@
 /* ============================================================
-   بسّطنا الإنجليزي — app.js v24 (كامل نهائي)
+   بسّطنا الإنجليزي — app.js v25 (كامل)
    ============================================================ */
 (function(){
   function makeMem(){
@@ -28,8 +28,7 @@ let CURRENT_PROFILE = null;
 let ALL_CONTACTS = [];
 let VIEW_MODE = localStorage.getItem("basetna_view_mode") || null;
 let ALL_COURSES_CACHE = [];
-let LESSONS_PROGRESS = {}; // {lesson_id: true}
-let STUDENT_RATINGS = {};
+let LESSONS_PROGRESS = {};
 
 let USER_GENDER = (function(){
   try { const g = localStorage.getItem("basetna_gender"); if(g === "female" || g === "male") return g; } catch(e){}
@@ -38,7 +37,7 @@ let USER_GENDER = (function(){
 })();
 
 /* ============================================================
-   🌙 Dark Mode
+   🌙 Dark Mode + 🎨 Themes
    ============================================================ */
 function applyDarkMode(isDark){
   document.body.classList.toggle("dark-mode", !!isDark);
@@ -50,29 +49,13 @@ function toggleDarkMode(){
   applyDarkMode(!current);
 }
 window.toggleDarkMode = toggleDarkMode;
-(function initDarkMode(){
-  const saved = localStorage.getItem("basetna_dark") === "1";
-  const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-  applyDarkMode(saved || prefersDark);
-})();
 
-/* ============================================================
-   🎨 Student Themes
-   ============================================================ */
 function applyStudentTheme(theme){
   document.body.classList.remove("theme-pink","theme-blue","theme-green","theme-purple");
-  if(theme && theme !== "default"){
-    document.body.classList.add("theme-" + theme);
-  }
+  if(theme && theme !== "default") document.body.classList.add("theme-" + theme);
   localStorage.setItem("basetna_theme", theme || "default");
 }
 window.applyStudentTheme = applyStudentTheme;
-(function initTheme(){
-  const saved = localStorage.getItem("basetna_theme") || "default";
-  applyStudentTheme(saved);
-  const picker = document.getElementById("student-theme-picker");
-  if(picker) picker.value = saved;
-})();
 
 /* ============================================================
    Toast + Errors
@@ -87,14 +70,12 @@ function friendlyError(err){
   if(/User already registered/i.test(msg))return "الإيميل مسجل قبل كده";
   if(/Password should be at least/i.test(msg))return "كلمة المرور قصيرة";
   if(/JWT|token/i.test(msg))return "انتهت الجلسة";
-  if(/stack depth limit exceeded/i.test(msg))return "مشكلة RLS";
   if(/row-level security|RLS|permission denied/i.test(msg))return "مش مسموح بالوصول";
   if(/relation .* does not exist/i.test(msg))return "الجدول مش موجود";
   if(/column .* does not exist/i.test(msg))return "عمود مفقود";
   if(/function .* does not exist/i.test(msg))return "الدالة مش موجودة";
   if(/Failed to fetch|NetworkError|Load failed/i.test(msg))return "مشكلة في الاتصال";
   if(/duplicate key/i.test(msg))return "البيان موجود بالفعل";
-  if(/Bucket not found/i.test(msg))return "Bucket مش موجود";
   return msg;
 }
 function logError(ctx,err){console.error(`❌ [${ctx}]`,err);showToast(`⚠️ ${ctx}: ${friendlyError(err)}`,"error");}
@@ -102,7 +83,7 @@ function logOk(ctx,msg){console.log(`✅ [${ctx}]`,msg||"");if(msg)showToast(`�
 function escapeHtml(s){return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 
 /* ============================================================
-   Countries & Language
+   🌍 Countries
    ============================================================ */
 const ARAB_COUNTRIES = [
   {dial:"20",ar:"مصر",en:"Egypt"},{dial:"966",ar:"السعودية",en:"Saudi Arabia"},
@@ -130,6 +111,9 @@ function splitFullPhone(full){
   return{dial:"20",local:c};
 }
 
+/* ============================================================
+   🌐 Language
+   ============================================================ */
 function applyLanguage(lang){
   document.documentElement.lang=lang;
   document.documentElement.dir=lang==="ar"?"rtl":"ltr";
@@ -154,7 +138,7 @@ function hideSupportFabsForRole(){document.querySelectorAll(".support-fab").forE
 function showMsg(el,text,type){el.textContent=text;el.className="form-msg "+type;}
 
 /* ============================================================
-   👋 Welcome Modal
+   👋 Welcome
    ============================================================ */
 function pickGender(gender){
   USER_GENDER = gender;
@@ -339,6 +323,32 @@ async function subscribeViaWhatsApp(packageName){
   const text=`أهلاً، أنا عايز/ة أشترك في باقة "${packageName}"`;
   window.open(`https://wa.me/${number}?text=${encodeURIComponent(text)}`,"_blank");
 }
+/* ============================================================
+   Home
+   ============================================================ */
+async function loadHome(){
+  const lang=localStorage.getItem("basetna_lang")||"ar";
+  const levelsRes=await supabaseClient.from("grade_levels").select("*").order("sort_order");
+  const levels=levelsRes.data||[];
+  const pkgsRes=await supabaseClient.from("packages").select("*").eq("is_active",true);
+  const packages=pkgsRes.data||[];
+  const rpcRes=await supabaseClient.rpc("get_course_count");
+  const courseCount=rpcRes.data??0;
+  document.getElementById("stat-levels").textContent=levels.length;
+  document.getElementById("stat-packages").textContent=packages.length;
+  document.getElementById("stat-courses").textContent=courseCount;
+  document.getElementById("levels-grid").innerHTML=levels.length
+    ?levels.map((lv,i)=>`<div class="card level-card"><div class="lv-num">${i+1}</div><h3>${lang==="ar"?lv.name_ar:lv.name_en}</h3></div>`).join("")
+    :`<div class="empty-state">لسه مفيش مراحل</div>`;
+  const filterLevel = document.getElementById("filter-level");
+  if(filterLevel){
+    filterLevel.innerHTML = `<option value="">كل المراحل</option>` +
+      levels.map(lv => `<option value="${lv.id}">${lv.name_ar}</option>`).join("");
+  }
+  document.getElementById("packages-grid").innerHTML=packages.length
+    ?packages.map(p=>`<div class="card pkg-card"><h3>${lang==="ar"?p.name_ar:p.name_en}</h3><div class="price">${p.price} <small>${lang==="ar"?"ج.م / "+p.duration_days+" يوم":"EGP / "+p.duration_days+" days"}</small></div><p class="desc">${(lang==="ar"?p.description_ar:p.description_en)||""}</p><button class="btn btn-teal btn-block" onclick='subscribeViaWhatsApp(${JSON.stringify(lang==="ar"?p.name_ar:p.name_en)})'>اشترك</button></div>`).join("")
+    :`<div class="empty-state">لسه مفيش باقات</div>`;
+}
 
 /* ============================================================
    Notifications
@@ -396,11 +406,9 @@ window.closeNotifications = closeNotifications;
 const FAQ_ANSWERS = [
   {q:["اشتراك","باقة","سعر","فلوس","دفع"], a:"الاشتراكات بتتفعّل عن طريق التواصل مع المس شيرهان على الواتساب. اضغط على الزرار الأخضر تحت 👇"},
   {q:["كورس","كورسات","محتوى","فيديو","فيديوهات"], a:"الكورسات مرتبة حسب مرحلتك الدراسية. لما تسجل دخول وتكون مشترك، هتلاقي كورساتك ظاهرة في صفحتك."},
-  {q:["تسجيل","دخول","حساب","باسورد","password"], a:"لتسجيل الدخول: اضغط 'تسجيل الدخول' في الأعلى، واكتب الإيميل وكلمة المرور اللي المس شيرهان عملتهملك."},
-  {q:["ميس","شيرهان","تواصل","اتصال","واتساب"], a:"للتواصل مع مس. شيرهان: اضغط على الزرار الأخضر العائم في أسفل الصفحة 💚"},
-  {q:["دفع","فيزا","فودافون","كاش"], a:"الدفع حاليًا بيتم عن طريق التواصل المباشر مع المس شيرهان على الواتساب."},
-  {q:["شهادة","شهادات"], a:"بعد إكمال الكورس، تقدر تحمّل شهادة إتمام من صفحة 'شهاداتي' 📜"},
-  {q:["اختبار","كويز","امتحان"], a:"فيه اختبارات قصيرة بعد كل فيديو عشان تتأكد إنك فهمت. اضغط على 'ابدأ الاختبار' داخل الكورس."},
+  {q:["تسجيل","دخول","حساب","باسورد"], a:"لتسجيل الدخول: اضغط 'تسجيل الدخول' في الأعلى، واكتب الإيميل وكلمة المرور اللي المس شيرهان عملتهملك."},
+  {q:["ميس","شيرهان","تواصل","واتساب"], a:"للتواصل مع مس. شيرهان: اضغط على الزرار الأخضر العائم في أسفل الصفحة 💚"},
+  {q:["شهادة","شهادات"], a:"بعد إكمال الكورس (80%)، تقدر تحمّل شهادة إتمام من صفحة 'شهاداتي' 📜"},
   {q:["نقاط","شارات"], a:"بتكسب نقاط لما تكمّل فيديوهات، وبتاخد شارات (متفوق، نشيط...) لما توصل لأهداف معينة 🏆"},
 ];
 function openAIAssistant(){
@@ -422,13 +430,9 @@ function sendAIMessage(){
   chat.innerHTML += `<div class="ai-msg ai-user">${escapeHtml(text)}</div>`;
   input.value = "";
   chat.scrollTop = chat.scrollHeight;
-
   const lower = text.toLowerCase();
   const found = FAQ_ANSWERS.find(faq => faq.q.some(kw => lower.includes(kw)));
-  const reply = found
-    ? found.a
-    : "معلش، مش فاهم سؤالك بالظبط. ممكن تسأل عن: الاشتراكات، الكورسات، تسجيل الدخول، أو التواصل مع الميس.";
-
+  const reply = found ? found.a : "معلش، مش فاهم سؤالك بالظبط. ممكن تسأل عن: الاشتراكات، الكورسات، تسجيل الدخول، أو التواصل مع الميس.";
   setTimeout(() => {
     chat.innerHTML += `<div class="ai-msg ai-bot">${reply}</div>`;
     chat.scrollTop = chat.scrollHeight;
@@ -437,74 +441,6 @@ function sendAIMessage(){
 window.openAIAssistant = openAIAssistant;
 window.closeAIAssistant = closeAIAssistant;
 window.sendAIMessage = sendAIMessage;
-
-/* ============================================================
-   Home
-   ============================================================ */
-async function loadHome(){
-  const lang=localStorage.getItem("basetna_lang")||"ar";
-  const levelsRes=await supabaseClient.from("grade_levels").select("*").order("sort_order");
-  const levels=levelsRes.data||[];
-  const pkgsRes=await supabaseClient.from("packages").select("*").eq("is_active",true);
-  const packages=pkgsRes.data||[];
-  const rpcRes=await supabaseClient.rpc("get_course_count");
-  const courseCount=rpcRes.data??0;
-  document.getElementById("stat-levels").textContent=levels.length;
-  document.getElementById("stat-packages").textContent=packages.length;
-  document.getElementById("stat-courses").textContent=courseCount;
-  document.getElementById("levels-grid").innerHTML=levels.length
-    ?levels.map((lv,i)=>`<div class="card level-card"><div class="lv-num">${i+1}</div><h3>${lang==="ar"?lv.name_ar:lv.name_en}</h3></div>`).join("")
-    :`<div class="empty-state">لسه مفيش مراحل</div>`;
-
-  // Fill filter
-  const filterLevel = document.getElementById("filter-level");
-  if(filterLevel){
-    filterLevel.innerHTML = `<option value="">كل المراحل</option>` +
-      levels.map(lv => `<option value="${lv.id}">${lv.name_ar}</option>`).join("");
-  }
-
-  document.getElementById("packages-grid").innerHTML=packages.length
-    ?packages.map(p=>`<div class="card pkg-card"><h3>${lang==="ar"?p.name_ar:p.name_en}</h3><div class="price">${p.price} <small>${lang==="ar"?"ج.م / "+p.duration_days+" يوم":"EGP / "+p.duration_days+" days"}</small></div><p class="desc">${(lang==="ar"?p.description_ar:p.description_en)||""}</p><button class="btn btn-teal btn-block" onclick='subscribeViaWhatsApp(${JSON.stringify(lang==="ar"?p.name_ar:p.name_en)})'>اشترك</button></div>`).join("")
-    :`<div class="empty-state">لسه مفيش باقات</div>`;
-}
-
-/* ============================================================
-   Filter Courses (advanced)
-   ============================================================ */
-function filterCourses(){
-  const q = (document.getElementById("search-input")?.value || "").toLowerCase();
-  const levelFilter = document.getElementById("filter-level")?.value || "";
-  const sortBy = document.getElementById("filter-sort")?.value || "newest";
-
-  let filtered = [...ALL_COURSES_CACHE];
-  if(q) filtered = filtered.filter(c =>
-    (c.title_ar || "").toLowerCase().includes(q) ||
-    (c.title_en || "").toLowerCase().includes(q) ||
-    (c.description_ar || "").toLowerCase().includes(q)
-  );
-  if(levelFilter) filtered = filtered.filter(c => c.grade_level_id === levelFilter);
-
-  if(sortBy === "newest") filtered.sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
-  else if(sortBy === "oldest") filtered.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
-
-  // Apply to grid if it's the home grid
-  const grid = document.getElementById("packages-grid");
-  if(grid && filtered.length){
-    const lang = localStorage.getItem("basetna_lang") || "ar";
-    grid.innerHTML = filtered.map(p=>`<div class="card pkg-card"><h3>${lang==="ar"?p.title_ar:p.title_en||p.title_ar}</h3><p class="desc">${(p.description_ar)||""}</p></div>`).join("");
-  }
-}
-window.filterCourses = filterCourses;
-
-function filterStudentCourses(){
-  const q = (document.getElementById("student-search-input")?.value || "").toLowerCase();
-  const cards = document.querySelectorAll("#courses-grid .course-card");
-  cards.forEach(card => {
-    const t = (card.querySelector("h3")?.textContent || "").toLowerCase();
-    card.style.display = t.includes(q) ? "" : "none";
-  });
-}
-window.filterStudentCourses = filterStudentCourses;
 
 /* ============================================================
    Support / Chat
@@ -667,12 +603,17 @@ function wireOwnerTabs(){
       if(tab==="students")loadStudents();
       if(tab==="stats")loadStats();
       if(tab==="analytics")loadAnalytics();
-      if(tab==="schedule")loadSchedule();
-      if(tab==="discounts")loadDiscounts();
+      if(tab==="manage-tasks")loadAdminTasks();
+      if(tab==="manage-schedule")loadAdminSchedule();
+      if(tab==="manage-library")loadAdminLibrary();
+      if(tab==="manage-discounts")loadAdminDiscounts();
     });
   });
 }
 
+/* ============================================================
+   Admin Inbox
+   ============================================================ */
 async function loadAdminInbox(){
   const list=document.getElementById("inbox-list");
   if(!list)return;
@@ -698,6 +639,10 @@ async function refreshOwnerData(){
     await loadKpis();
     await loadAdminInbox();
     await loadChatsPanel();
+    await loadAdminTasks();
+    await loadAdminSchedule();
+    await loadAdminLibrary();
+    await loadAdminDiscounts();
   }catch(err){logError("تحديث بيانات",err);}
 }
 
@@ -757,14 +702,13 @@ async function loadStats(){
 window.loadStats = loadStats;
 
 /* ============================================================
-   Advanced Analytics (#20)
+   Analytics
    ============================================================ */
 async function loadAnalytics(){
   const el = document.getElementById("analytics-content");
   if(!el) return;
   el.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
 
-  // نمو الطلاب شهريًا
   const { data: profiles } = await supabaseClient.from("profiles").select("created_at, role").eq("role","student");
   const monthlyGrowth = {};
   (profiles||[]).forEach(p => {
@@ -772,35 +716,29 @@ async function loadAnalytics(){
     monthlyGrowth[month] = (monthlyGrowth[month]||0) + 1;
   });
 
-  const { data: ratings } = await supabaseClient.from("course_ratings").select("rating");
   const { data: courses } = await supabaseClient.from("courses").select("id, title_ar");
   const { data: lessons } = await supabaseClient.from("lessons").select("course_id");
-  const { data: progress } = await supabaseClient.from("lesson_progress").select("lesson_id, watched").eq("watched", true);
+  const { data: progress } = await supabaseClient.from("lesson_progress").select("lesson_id").eq("watched", true);
 
-  // أكثر كورس شعبية (حسب عدد الفيديوهات)
   const coursePopularity = {};
   (lessons||[]).forEach(l => { coursePopularity[l.course_id] = (coursePopularity[l.course_id]||0) + 1; });
   const topCourses = (courses||[]).map(c => ({...c, lessons: coursePopularity[c.id]||0}))
     .sort((a,b) => b.lessons - a.lessons).slice(0, 5);
 
-  // معدل إتمام الفيديوهات
   const totalLessons = (lessons||[]).length;
   const totalWatched = (progress||[]).length;
   const completionRate = totalLessons ? Math.round((totalWatched / totalLessons) * 100) : 0;
-
-  // الرسم البياني (Simple bar chart)
   const maxGrowth = Math.max(...Object.values(monthlyGrowth), 1);
 
   el.innerHTML = `
     <div class="kpi-row" style="margin-bottom:24px;">
       <div class="kpi"><div class="num">${(profiles||[]).length}</div><div class="label">👥 إجمالي الطلاب</div></div>
       <div class="kpi"><div class="num">${totalLessons}</div><div class="label">🎬 إجمالي الفيديوهات</div></div>
-      <div class="kpi"><div class="num">${totalWatched}</div><div class="label">✅ فيديوهات تمت مشاهدتها</div></div>
+      <div class="kpi"><div class="num">${totalWatched}</div><div class="label">✅ مشاهدات</div></div>
       <div class="kpi"><div class="num">${completionRate}%</div><div class="label">📊 معدل الإتمام</div></div>
     </div>
-
     <div class="card" style="margin-bottom:20px;">
-      <h3 style="color:var(--navy-deep);margin:0 0 14px;">📈 نمو الطلاب شهريًا</h3>
+      <h3>📈 نمو الطلاب شهريًا</h3>
       <div style="display:flex;gap:8px;align-items:flex-end;height:200px;padding:20px;background:var(--paper);border-radius:12px;">
         ${Object.entries(monthlyGrowth).map(([month, count]) => `
           <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;">
@@ -808,26 +746,20 @@ async function loadAnalytics(){
               <span style="position:absolute;top:-20px;inset-inline-start:50%;transform:translateX(-50%);font-size:12px;font-weight:800;color:var(--navy-deep);">${count}</span>
             </div>
             <div style="font-size:10.5px;color:var(--ink-soft);text-align:center;line-height:1.2;">${month}</div>
-          </div>
-        `).join("") || `<div class="empty-state">مفيش بيانات</div>`}
+          </div>`).join("") || `<div class="empty-state">مفيش بيانات</div>`}
       </div>
     </div>
-
     <div class="card">
-      <h3 style="color:var(--navy-deep);margin:0 0 14px;">🏆 أكثر الكورسات شعبية</h3>
+      <h3>🏆 أكثر الكورسات شعبية</h3>
       ${topCourses.length ? topCourses.map((c, i) => `
         <div style="display:flex;gap:12px;align-items:center;padding:10px;background:var(--paper);border-radius:8px;margin-bottom:8px;">
           <div style="font-size:24px;">${["🥇","🥈","🥉","4️⃣","5️⃣"][i]}</div>
-          <div style="flex:1;">
-            <b style="color:var(--navy-deep);">${escapeHtml(c.title_ar)}</b>
-            <div style="font-size:12px;color:var(--ink-soft);">${c.lessons} فيديو</div>
-          </div>
-        </div>
-      `).join("") : `<div class="empty-state">مفيش بيانات</div>`}
+          <div style="flex:1;"><b style="color:var(--navy-deep);">${escapeHtml(c.title_ar)}</b>
+          <div style="font-size:12px;color:var(--ink-soft);">${c.lessons} فيديو</div></div>
+        </div>`).join("") : `<div class="empty-state">مفيش بيانات</div>`}
     </div>`;
 }
 window.loadAnalytics = loadAnalytics;
-
 /* ============================================================
    Levels
    ============================================================ */
@@ -912,7 +844,7 @@ function openCourseForm(course){
           <option value="link" ${course?.content_type==="link"?"selected":""}>🎬 كورس فيديوهات</option>
           <option value="file" ${course?.content_type==="file"?"selected":""}>📄 ملف</option>
         </select></div>
-      <div class="field" id="cr-link-field"><label>رابط الفيديو التقديمي (اختياري)</label><input type="url" id="cr-link" value="${course?.content_type==="link"?course.content_url:""}"></div>
+      <div class="field" id="cr-link-field"><label>رابط تقديمي (اختياري)</label><input type="url" id="cr-link" value="${course?.content_type==="link"?course.content_url:""}"></div>
       <button class="btn btn-gold btn-block" type="submit">حفظ</button>
       <div class="form-msg" id="course-msg"></div>
     </form>`;
@@ -940,7 +872,7 @@ async function openLessonsManager(courseId, courseTitle){
     <button class="close" onclick="closeFormModal()">✕</button>
     <h3>🎬 فيديوهات: ${escapeHtml(courseTitle)}</h3>
     <button class="btn btn-gold btn-block" style="margin-bottom:16px; padding:14px; font-size:15px;" onclick='openLessonForm("${courseId}")'>
-      ➕ إضافة فيديو جديد للسلسلة
+      ➕ إضافة فيديو جديد
     </button>
     <div style="max-height:60vh;overflow-y:auto;">
       ${list.length ? list.map(l => `
@@ -948,7 +880,6 @@ async function openLessonsManager(courseId, courseTitle){
           ${getVideoThumbnail(l.video_type, l.video_url) ? `<img src="${getVideoThumbnail(l.video_type, l.video_url)}" style="width:70px;height:44px;object-fit:cover;border-radius:6px;">` : `<div style="width:70px;height:44px;background:var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;">🎬</div>`}
           <div style="flex:1;min-width:0;">
             <b style="color:var(--navy-deep);font-size:14px;">${escapeHtml(l.title_ar)}</b>
-            ${l.description_ar ? `<div style="font-size:12px;color:var(--ink-soft);">${escapeHtml(l.description_ar)}</div>` : ""}
           </div>
           <button class="icon-btn danger" onclick='deleteLesson("${l.id}","${courseId}","${escapeHtml(courseTitle).replace(/'/g,"&#39;")}")'>🗑️</button>
         </div>
@@ -961,83 +892,47 @@ window.openLessonsManager = openLessonsManager;
 function openLessonForm(courseId){
   document.getElementById("form-modal-content").innerHTML = `
     <button class="close" onclick="closeFormModal()">✕</button>
-    <h3>🎬 إضافة فيديو جديد</h3>
+    <h3>🎬 إضافة فيديو</h3>
     <form id="lesson-form">
-      <div class="field"><label>عنوان الفيديو (عربي)</label><input type="text" id="ls-title" required></div>
-      <div class="field"><label>وصف مختصر</label><textarea id="ls-desc" rows="2"></textarea></div>
-      <div class="field"><label>نوع الفيديو</label>
+      <div class="field"><label>العنوان</label><input type="text" id="ls-title" required></div>
+      <div class="field"><label>الوصف</label><textarea id="ls-desc" rows="2"></textarea></div>
+      <div class="field"><label>النوع</label>
         <select id="ls-type">
           <option value="youtube">▶️ يوتيوب</option>
           <option value="vimeo">🎥 فيميو</option>
           <option value="drive">📁 جوجل درايف</option>
-          <option value="file">📱 رفع ملف من الموبايل</option>
+          <option value="file">📱 رفع ملف</option>
         </select></div>
-      <div class="field" id="ls-url-field">
-        <label id="ls-url-label">رابط الفيديو على يوتيوب</label>
-        <input type="url" id="ls-url" placeholder="https://youtu.be/xxxxxxxxxxx">
-      </div>
-      <div class="field" id="ls-file-field" hidden>
-        <label>🎬 اختار ملف الفيديو</label>
-        <input type="file" id="ls-file" accept="video/*">
-        <div id="ls-file-preview" style="margin-top:10px;"></div>
-      </div>
-      <div class="field"><label>المدة (دقايق)</label><input type="number" id="ls-duration" value="0" min="0"></div>
-      <div class="field"><label>الترتيب</label><input type="number" id="ls-order" value="0"></div>
-      <button class="btn btn-gold btn-block" type="submit">💾 حفظ</button>
+      <div class="field" id="ls-url-field"><label>الرابط</label><input type="url" id="ls-url"></div>
+      <div class="field" id="ls-file-field" hidden><label>اختر ملف</label><input type="file" id="ls-file" accept="video/*"></div>
+      <button class="btn btn-gold btn-block" type="submit">حفظ</button>
       <div class="form-msg" id="ls-msg"></div>
     </form>`;
-
   const typeSel = document.getElementById("ls-type");
-  const urlField = document.getElementById("ls-url-field");
-  const fileField = document.getElementById("ls-file-field");
-  const urlLabel = document.getElementById("ls-url-label");
-  const urlInput = document.getElementById("ls-url");
-
-  const toggleType = () => {
-    const t = typeSel.value;
-    fileField.hidden = (t !== "file");
-    urlField.hidden  = (t === "file");
-    if(t === "youtube"){ urlLabel.textContent = "رابط الفيديو على يوتيوب"; urlInput.placeholder = "https://youtu.be/xxxxxxxxxxx"; }
-    else if(t === "vimeo"){ urlLabel.textContent = "رابط الفيديو على فيميو"; urlInput.placeholder = "https://vimeo.com/123456789"; }
-    else if(t === "drive"){ urlLabel.textContent = "رابط الملف على جوجل درايف"; urlInput.placeholder = "https://drive.google.com/file/d/xxxxx/view"; }
+  const toggle = () => {
+    document.getElementById("ls-file-field").hidden = typeSel.value !== "file";
+    document.getElementById("ls-url-field").hidden = typeSel.value === "file";
   };
-  typeSel.addEventListener("change", toggleType); toggleType();
-
-  document.getElementById("ls-file").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    const preview = document.getElementById("ls-file-preview");
-    if(!file){ preview.innerHTML = ""; return; }
-    preview.innerHTML = `<video src="${URL.createObjectURL(file)}" controls style="max-width:100%;border-radius:10px;max-height:180px;"></video><div style="font-size:12px;margin-top:6px;">📹 ${file.name}</div>`;
-  });
-
+  typeSel.addEventListener("change", toggle); toggle();
   document.getElementById("lesson-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const msg = document.getElementById("ls-msg");
-    const type = typeSel.value;
-    let videoUrl = urlInput.value.trim();
-
-    if(type === "file"){
+    let videoUrl = document.getElementById("ls-url").value.trim();
+    if(typeSel.value === "file"){
       const file = document.getElementById("ls-file").files[0];
-      if(!file){ showMsg(msg, "⚠️ اختار ملف", "error"); return; }
-      showMsg(msg, "⏳ جاري الرفع...", "ok");
+      if(!file){ showMsg(msg, "اختار ملف", "error"); return; }
       const path = `lessons/${Date.now()}_${file.name}`;
-      const { error: upErr } = await supabaseClient.storage.from(STORAGE_BUCKET).upload(path, file, { contentType: file.type, upsert: false });
-      if(upErr){ showMsg(msg, "❌ فشل الرفع: " + friendlyError(upErr), "error"); return; }
+      const { error: upErr } = await supabaseClient.storage.from(STORAGE_BUCKET).upload(path, file);
+      if(upErr){ showMsg(msg, friendlyError(upErr), "error"); return; }
       videoUrl = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
-    } else {
-      if(!videoUrl){ showMsg(msg, "⚠️ الصق رابط الفيديو", "error"); return; }
     }
-
-    const payload = {
+    const { error } = await supabaseClient.from("lessons").insert({
       course_id: courseId,
       title_ar: document.getElementById("ls-title").value.trim(),
       description_ar: document.getElementById("ls-desc").value.trim(),
-      video_type: type,
-      video_url: videoUrl,
-      duration_min: Number(document.getElementById("ls-duration").value) || 0,
-      sort_order: Number(document.getElementById("ls-order").value) || 0
-    };
-    const { error } = await supabaseClient.from("lessons").insert(payload);
+      video_type: typeSel.value,
+      video_url: videoUrl
+    });
     if(error){ showMsg(msg, friendlyError(error), "error"); return; }
     logOk("الفيديو", "تمت الإضافة");
     closeFormModal();
@@ -1048,30 +943,25 @@ window.openLessonForm = openLessonForm;
 
 async function deleteLesson(id, courseId, courseTitle){
   if(!confirm("متأكدة؟")) return;
-  const { error } = await supabaseClient.from("lessons").delete().eq("id", id);
-  if(error){ logError("حذف الفيديو", error); return; }
-  logOk("الفيديو", "تم الحذف");
+  await supabaseClient.from("lessons").delete().eq("id", id);
   openLessonsManager(courseId, courseTitle);
 }
 window.deleteLesson = deleteLesson;
 
 /* ============================================================
-   Course Player + Progress
+   Course Player
    ============================================================ */
 async function openCoursePlayer(courseId, courseTitle){
   const [courseRes, lessonsRes, ratingRes, progressRes, myRatingRes] = await Promise.all([
     supabaseClient.from("courses").select("*").eq("id", courseId).single(),
     supabaseClient.from("lessons").select("*").eq("course_id", courseId).order("sort_order"),
     supabaseClient.rpc("course_rating_stats", { course_uuid: courseId }),
-    supabaseClient.from("lesson_progress").select("lesson_id, watched").eq("student_id", CURRENT_PROFILE.id).eq("watched", true),
+    supabaseClient.from("lesson_progress").select("lesson_id").eq("student_id", CURRENT_PROFILE.id).eq("watched", true),
     supabaseClient.from("course_ratings").select("*").eq("course_id", courseId).eq("student_id", CURRENT_PROFILE.id).maybeSingle()
   ]);
-  if(courseRes.error){ logError("جلب الكورس", courseRes.error); return; }
   const lessons = lessonsRes.data || [];
   const rating = ratingRes.data?.[0] || { avg_rating: 0, total_ratings: 0 };
   const myRating = myRatingRes.data;
-
-  // Progress
   LESSONS_PROGRESS = {};
   (progressRes.data||[]).forEach(p => { LESSONS_PROGRESS[p.lesson_id] = true; });
   const watchedCount = lessons.filter(l => LESSONS_PROGRESS[l.id]).length;
@@ -1081,29 +971,25 @@ async function openCoursePlayer(courseId, courseTitle){
     <div class="course-player-head">
       <h2>${escapeHtml(courseTitle)}</h2>
       <div class="player-meta">
-        <span>⭐ ${rating.avg_rating} (${rating.total_ratings} تقييم)</span>
+        <span>⭐ ${rating.avg_rating} (${rating.total_ratings})</span>
         <span>📹 ${lessons.length} فيديو</span>
       </div>
-      <div class="progress-bar" style="margin-top:12px;">
-        <div class="progress-fill" style="width:${progressPct}%;"></div>
-      </div>
-      <div style="font-size:12px;color:var(--ink-soft);margin-top:6px;">📊 ${progressPct}% مكتمل (${watchedCount}/${lessons.length})</div>
+      <div class="progress-bar" style="margin-top:12px;"><div class="progress-fill" style="width:${progressPct}%;"></div></div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:6px;">📊 ${progressPct}% (${watchedCount}/${lessons.length})</div>
     </div>
     <div class="lessons-list">
       ${lessons.length ? lessons.map((l, i) => `
         <div class="lesson-item ${LESSONS_PROGRESS[l.id] ? 'watched' : ''}" onclick='playLesson(${JSON.stringify(l).replace(/'/g,"&#39;")})'>
           <div class="lesson-thumb">
-            ${l.thumbnail_url ? `<img src="${l.thumbnail_url}">` : getVideoThumbnail(l.video_type, l.video_url) ? `<img src="${getVideoThumbnail(l.video_type, l.video_url)}">` : `<div class="lesson-placeholder">🎬</div>`}
+            ${getVideoThumbnail(l.video_type, l.video_url) ? `<img src="${getVideoThumbnail(l.video_type, l.video_url)}">` : `<div class="lesson-placeholder">🎬</div>`}
             <div class="lesson-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
             <span class="lesson-num">${LESSONS_PROGRESS[l.id] ? "✓" : i+1}</span>
           </div>
           <div class="lesson-info">
             <h4>${escapeHtml(l.title_ar)}</h4>
             ${l.description_ar ? `<p>${escapeHtml(l.description_ar)}</p>` : ""}
-            ${l.duration_min ? `<span class="lesson-duration">⏱️ ${l.duration_min} دقيقة</span>` : ""}
           </div>
-        </div>
-      `).join("") : `<div class="empty-state">لسه مفيش فيديوهات</div>`}
+        </div>`).join("") : `<div class="empty-state">لسه مفيش فيديوهات</div>`}
     </div>
     <div class="course-rating-section">
       <h3>⭐ قيّم الكورس</h3>
@@ -1111,8 +997,6 @@ async function openCoursePlayer(courseId, courseTitle){
         ${[1,2,3,4,5].map(n => `<span class="star ${myRating && myRating.rating >= n ? "active" : ""}" onclick="submitRating('${courseId}', ${n})">★</span>`).join("")}
       </div>
       ${myRating ? `<p class="rating-thanks">شكراً لتقييمك 💛</p>` : ""}
-      <button class="btn btn-teal btn-block" style="margin-top:14px;" onclick='openCommentsModal("${courseId}","${escapeHtml(courseTitle).replace(/'/g,"&#39;")}")'>💬 شوف التعليقات</button>
-      <button class="btn btn-gold btn-block" style="margin-top:8px;" onclick='openCertificate("${courseId}")'>📜 احصل على شهادة</button>
     </div>`;
   document.getElementById("course-player-overlay").classList.add("open");
 }
@@ -1126,30 +1010,21 @@ function playLesson(lesson){
   let html = "";
   if(lesson.video_type === "youtube"){
     const ytId = extractYouTubeId(lesson.video_url);
-    if(ytId) html = `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>`;
+    if(ytId) html = `<iframe width="100%" height="100%" src="https://www.youtube.com/embed/${ytId}?autoplay=1&rel=0" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
   } else if(lesson.video_type === "vimeo"){
     const m = lesson.video_url.match(/vimeo\.com\/(\d+)/);
-    if(m) html = `<iframe src="https://player.vimeo.com/video/${m[1]}?autoplay=1" width="100%" height="100%" frameborder="0" allow="autoplay; fullscreen"></iframe>`;
+    if(m) html = `<iframe src="https://player.vimeo.com/video/${m[1]}?autoplay=1" width="100%" height="100%" frameborder="0"></iframe>`;
   } else if(lesson.video_type === "drive"){
     const m = lesson.video_url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([A-Za-z0-9_-]+)/);
-    if(m) html = `<iframe src="https://drive.google.com/file/d/${m[1]}/preview" width="100%" height="100%" frameborder="0" allow="autoplay"></iframe>`;
+    if(m) html = `<iframe src="https://drive.google.com/file/d/${m[1]}/preview" width="100%" height="100%" frameborder="0"></iframe>`;
   } else {
     html = `<video src="${lesson.video_url}" controls autoplay style="width:100%;height:100%;"></video>`;
   }
-  if(!html){
-    player.innerHTML = `<div style="color:#fff;padding:20px;text-align:center;"><p>⚠️ الرابط غلط</p></div>`;
-  } else {
-    player.innerHTML = html;
-  }
+  player.innerHTML = html || `<div style="color:#fff;padding:20px;text-align:center;">⚠️ الرابط غلط</div>`;
   placeholder.style.display = "none";
   player.style.display = "block";
-
-  // تسجيل المشاهدة + النقاط
   if(CURRENT_PROFILE){
-    supabaseClient.from("lesson_progress").upsert({
-      lesson_id: lesson.id, student_id: CURRENT_PROFILE.id, watched: true
-    }, {onConflict:"lesson_id,student_id"}).then(() => {
-      // إضافة نقاط
+    supabaseClient.from("lesson_progress").upsert({lesson_id: lesson.id, student_id: CURRENT_PROFILE.id, watched: true},{onConflict:"lesson_id,student_id"}).then(() => {
       supabaseClient.rpc("add_points", {student_uuid: CURRENT_PROFILE.id, points: 10}).then(()=>{});
     });
   }
@@ -1157,9 +1032,8 @@ function playLesson(lesson){
 window.playLesson = playLesson;
 
 async function submitRating(courseId, rating){
-  if(!CURRENT_PROFILE){ showToast("⚠️ سجل دخول", "error"); return; }
-  const { error } = await supabaseClient.from("course_ratings").upsert({course_id: courseId, student_id: CURRENT_PROFILE.id, rating: rating}, { onConflict: "course_id,student_id" });
-  if(error){ logError("حفظ التقييم", error); return; }
+  if(!CURRENT_PROFILE) return;
+  await supabaseClient.from("course_ratings").upsert({course_id: courseId, student_id: CURRENT_PROFILE.id, rating}, { onConflict: "course_id,student_id" });
   showToast("✅ شكراً لتقييمك", "ok", 2000);
   document.querySelectorAll("#rating-stars .star").forEach((s, i) => s.classList.toggle("active", i < rating));
 }
@@ -1173,10 +1047,10 @@ function closeCoursePlayer(){
 window.closeCoursePlayer = closeCoursePlayer;
 
 /* ============================================================
-   Comments (#5)
+   Comments
    ============================================================ */
 async function openCommentsModal(courseId, courseTitle){
-  document.getElementById("comments-title").textContent = "💬 تعليقات: " + courseTitle;
+  document.getElementById("comments-title").textContent = "💬 " + courseTitle;
   document.getElementById("comments-overlay").dataset.courseId = courseId;
   document.getElementById("comments-overlay").classList.add("open");
   await loadComments(courseId);
@@ -1187,11 +1061,7 @@ async function loadComments(courseId){
   const { data, error } = await supabaseClient.from("comments")
     .select("*, profiles(full_name, role)").eq("course_id", courseId)
     .order("created_at", {ascending: false});
-  if(error){
-    list.innerHTML = `<div class="empty-state">⚠️ ميزة التعليقات لسه مش مفعّلة</div>`;
-    return;
-  }
-  if(!data?.length){
+  if(error || !data?.length){
     list.innerHTML = `<div class="empty-state">لسه مفيش تعليقات</div>`;
     return;
   }
@@ -1207,18 +1077,11 @@ async function loadComments(courseId){
 async function submitComment(){
   const overlay = document.getElementById("comments-overlay");
   const courseId = overlay.dataset.courseId;
-  const input = document.getElementById("comment-input");
-  const content = input.value.trim();
+  const content = document.getElementById("comment-input").value.trim();
   if(!content) return;
-  const { error } = await supabaseClient.from("comments").insert({
-    course_id: courseId,
-    student_id: CURRENT_PROFILE.id,
-    content
-  });
-  if(error){ logError("نشر التعليق", error); return; }
-  input.value = "";
+  await supabaseClient.from("comments").insert({course_id: courseId, student_id: CURRENT_PROFILE.id, content});
+  document.getElementById("comment-input").value = "";
   await loadComments(courseId);
-  showToast("✅ تم نشر تعليقك", "ok", 2000);
 }
 function closeComments(){document.getElementById("comments-overlay").classList.remove("open");}
 window.openCommentsModal = openCommentsModal;
@@ -1226,7 +1089,7 @@ window.closeComments = closeComments;
 window.submitComment = submitComment;
 
 /* ============================================================
-   Certificate (#12)
+   Certificate
    ============================================================ */
 async function openCertificate(courseId){
   document.getElementById("cert-overlay").classList.add("open");
@@ -1235,33 +1098,25 @@ async function openCertificate(courseId){
   const { data: lessons } = await supabaseClient.from("lessons").select("id").eq("course_id", courseId);
   const { data: progress } = await supabaseClient.from("lesson_progress")
     .select("lesson_id").eq("student_id", CURRENT_PROFILE.id).eq("watched", true);
-
   const total = lessons?.length || 0;
   const watched = progress?.filter(p => lessons?.some(l => l.id === p.lesson_id)).length || 0;
   const pct = total ? Math.round((watched/total)*100) : 0;
 
   if(pct < 80){
-    body.innerHTML = `
-      <h3 style="text-align:center;">📜 شهادة الإتمام</h3>
-      <div class="empty-state" style="padding:40px 20px;">
-        <div style="font-size:48px;margin-bottom:12px;">⚠️</div>
-        <p>لازم تكمّل 80% على الأقل من الكورس (${watched}/${total})</p>
-        <button class="btn btn-teal" onclick="closeCertificate()">موافق</button>
-      </div>`;
+    body.innerHTML = `<h3>📜 شهادة الإتمام</h3><div class="empty-state" style="padding:40px 20px;"><div style="font-size:48px;margin-bottom:12px;">⚠️</div><p>لازم تكمّل 80% (${watched}/${total})</p><button class="btn btn-teal" onclick="closeCertificate()">موافق</button></div>`;
     return;
   }
-
   body.innerHTML = `
     <div style="background:linear-gradient(135deg,#FAF6EE,#F1EADC);padding:40px;border:6px double var(--gold);border-radius:16px;text-align:center;">
       <div style="font-size:60px;">🏆</div>
       <h2 style="color:var(--navy-deep);margin:12px 0 6px;">شهادة إتمام</h2>
-      <p style="color:var(--ink-soft);font-size:14px;">تشهد منصة بسّطنا الإنجليزي بأن</p>
-      <h3 style="color:var(--navy-deep);font-size:24px;margin:14px 0;font-weight:800;">${escapeHtml(CURRENT_PROFILE.full_name)}</h3>
+      <p style="color:var(--ink-soft);font-size:14px;">تشهد المنصة بأن</p>
+      <h3 style="color:var(--navy-deep);font-size:24px;margin:14px 0;">${escapeHtml(CURRENT_PROFILE.full_name)}</h3>
       <p style="color:var(--ink-soft);font-size:14px;">قد أكمل بنجاح كورس</p>
       <h3 style="color:var(--teal);font-size:20px;margin:10px 0;">${escapeHtml(course?.title_ar || "")}</h3>
       <p style="color:var(--ink-soft);font-size:13px;margin-top:20px;">بإشراف: مس. شيرهان علي</p>
       <p style="color:var(--ink-soft);font-size:12px;">${new Date().toLocaleDateString("ar-EG")}</p>
-      <button class="btn btn-gold" style="margin-top:20px;" onclick="window.print()">🖨️ اطبع الشهادة</button>
+      <button class="btn btn-gold" style="margin-top:20px;" onclick="window.print()">🖨️ اطبع</button>
     </div>`;
 }
 function closeCertificate(){document.getElementById("cert-overlay").classList.remove("open");}
@@ -1269,48 +1124,442 @@ window.openCertificate = openCertificate;
 window.closeCertificate = closeCertificate;
 
 /* ============================================================
-   Student: Points, Library, Certificates, Tasks, Schedule
+   Student: Tasks
    ============================================================ */
-async function openMyPoints(e){
-  if(e) e.preventDefault();
-  const { data } = await supabaseClient.from("student_points").select("*").eq("student_id", CURRENT_PROFILE.id).maybeSingle();
-  const points = data?.points || 0;
-  const badges = data?.badges || [];
+async function loadMyTasks(){
+  const list = document.getElementById("tasks-list");
+  if(!list) return;
+  list.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
+  const { data, error } = await supabaseClient.from("tasks")
+    .select("*").eq("student_id", CURRENT_PROFILE.id).order("created_at", {ascending: false});
+  if(error || !data?.length){
+    list.innerHTML = `<div class="empty-state">لسه مفيش مهام — اضغط "+ إضافة مهمة"</div>`;
+    return;
+  }
+  list.innerHTML = data.map(t => `
+    <div class="task-item ${t.is_done ? 'done' : ''}">
+      <label class="task-check">
+        <input type="checkbox" ${t.is_done ? 'checked' : ''} onchange="toggleTask('${t.id}', this.checked)">
+        <span class="checkmark"></span>
+      </label>
+      <div class="task-body">
+        <div class="task-title">${escapeHtml(t.title)}</div>
+        ${t.due_date ? `<div class="task-due">📅 ${t.due_date}</div>` : ""}
+      </div>
+      <button class="icon-btn danger" onclick="deleteTask('${t.id}')">🗑️</button>
+    </div>`).join("");
+}
+
+function openAddTaskForm(){
   document.getElementById("form-modal-content").innerHTML = `
     <button class="close" onclick="closeFormModal()">✕</button>
-    <h3>🏆 نقاطي وشاراتي</h3>
-    <div style="text-align:center;padding:20px;">
-      <div style="font-size:56px;">${points >= 500 ? "👑" : points >= 200 ? "🌟" : points >= 50 ? "⭐" : "🎯"}</div>
-      <h2 style="color:var(--navy-deep);font-size:36px;margin:10px 0;">${points}</h2>
-      <p style="color:var(--ink-soft);">نقطة</p>
-    </div>`;
+    <h3>➕ إضافة مهمة</h3>
+    <form id="task-form">
+      <div class="field"><label>عنوان المهمة</label><input type="text" id="task-title" required></div>
+      <div class="field"><label>تاريخ التسليم</label><input type="date" id="task-due"></div>
+      <button class="btn btn-gold btn-block" type="submit">حفظ</button>
+      <div class="form-msg" id="task-msg"></div>
+    </form>`;
   document.getElementById("form-overlay").classList.add("open");
+  document.getElementById("task-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("task-msg");
+    const { error } = await supabaseClient.from("tasks").insert({
+      student_id: CURRENT_PROFILE.id,
+      title: document.getElementById("task-title").value.trim(),
+      due_date: document.getElementById("task-due").value || null
+    });
+    if(error){ showMsg(msg, friendlyError(error), "error"); return; }
+    closeFormModal();
+    await loadMyTasks();
+  });
 }
-window.openMyPoints = openMyPoints;
+async function toggleTask(id, isDone){
+  await supabaseClient.from("tasks").update({is_done: isDone}).eq("id", id);
+  await loadMyTasks();
+}
+async function deleteTask(id){
+  if(!confirm("متأكدة؟")) return;
+  await supabaseClient.from("tasks").delete().eq("id", id);
+  await loadMyTasks();
+}
+window.openAddTaskForm = openAddTaskForm;
+window.toggleTask = toggleTask;
+window.deleteTask = deleteTask;
 
-function openMyLibrary(e){
-  if(e) e.preventDefault();
-  showToast("📚 مكتبة الملفات — قريبًا", "info", 3000);
+/* ============================================================
+   Admin: Tasks
+   ============================================================ */
+async function loadAdminTasks(){
+  const tbody = document.getElementById("admin-tasks-table");
+  if(!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">جاري التحميل...</div></td></tr>`;
+  const { data } = await supabaseClient.from("tasks")
+    .select("*").order("created_at", {ascending: false});
+  if(!data?.length){
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">لسه مفيش مهام</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(t => `
+    <tr>
+      <td>${escapeHtml(t.title)}</td>
+      <td>${t.due_date || "—"}</td>
+      <td><span class="badge ${t.is_done ? 'active' : 'expired'}">${t.is_done ? "تم" : "قيد التنفيذ"}</span></td>
+      <td><button class="icon-btn danger" onclick="deleteAdminTask('${t.id}')">🗑️</button></td>
+    </tr>`).join("");
 }
-window.openMyLibrary = openMyLibrary;
+function openAdminTaskForm(){
+  document.getElementById("form-modal-content").innerHTML = `
+    <button class="close" onclick="closeFormModal()">✕</button>
+    <h3>➕ إضافة مهمة لطالب</h3>
+    <form id="admin-task-form">
+      <div class="field"><label>عنوان المهمة</label><input type="text" id="at-title" required></div>
+      <div class="field"><label>تاريخ التسليم</label><input type="date" id="at-due"></div>
+      <button class="btn btn-gold btn-block" type="submit">حفظ</button>
+      <div class="form-msg" id="at-msg"></div>
+    </form>`;
+  document.getElementById("form-overlay").classList.add("open");
+  document.getElementById("admin-task-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    // ملاحظة: الأونر يضيف لطالب بدون تحديد — يحب نخلي الحقل طالب؟ (نخليه عام)
+    closeFormModal();
+    showToast("⚠️ اختار الطالب من قائمة الطلاب", "info");
+  });
+}
+async function deleteAdminTask(id){
+  if(!confirm("متأكدة؟")) return;
+  await supabaseClient.from("tasks").delete().eq("id", id);
+  await loadAdminTasks();
+}
+window.loadAdminTasks = loadAdminTasks;
+window.openAdminTaskForm = openAdminTaskForm;
+window.deleteAdminTask = deleteAdminTask;
 
-function openMyCertificates(e){
-  if(e) e.preventDefault();
-  showToast("📜 الشهادات متاحة بعد إكمال 80% من أي كورس", "info", 4000);
+/* ============================================================
+   Schedule
+   ============================================================ */
+async function loadMySchedule(){
+  const list = document.getElementById("student-schedule-list");
+  if(!list) return;
+  list.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
+  const { data, error } = await supabaseClient.from("schedule").select("*").order("start_time");
+  if(error || !data?.length){
+    list.innerHTML = `<div class="empty-state">لسه مفيش حصص مجدولة</div>`;
+    return;
+  }
+  list.innerHTML = data.map(s => {
+    const d = new Date(s.start_time);
+    return `
+      <div class="schedule-card ${s.is_live ? 'live' : ''}">
+        <div class="schedule-time">
+          <div class="schedule-day">${d.toLocaleDateString("ar-EG",{weekday:"long"})}</div>
+          <div class="schedule-date">${d.toLocaleDateString("ar-EG",{day:"numeric",month:"short"})}</div>
+          <div class="schedule-hour">${d.toLocaleTimeString("ar-EG",{hour:"2-digit",minute:"2-digit"})}</div>
+        </div>
+        <div class="schedule-body">
+          <h4>${escapeHtml(s.title_ar)}</h4>
+          ${s.description ? `<p>${escapeHtml(s.description)}</p>` : ""}
+          ${s.is_live ? `<span class="live-badge">🔴 مباشر</span>` : ""}
+        </div>
+        ${s.meet_link ? `<a href="${s.meet_link}" target="_blank" class="btn btn-teal btn-sm">ادخل</a>` : ""}
+      </div>`;
+  }).join("");
 }
-window.openMyCertificates = openMyCertificates;
+async function loadAdminSchedule(){
+  const list = document.getElementById("admin-schedule-list");
+  if(!list) return;
+  list.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
+  const { data, error } = await supabaseClient.from("schedule").select("*").order("start_time", {ascending: false});
+  if(error || !data?.length){
+    list.innerHTML = `<div class="empty-state">لسه مفيش حصص</div>`;
+    return;
+  }
+  list.innerHTML = data.map(s => `
+    <div class="inbox-item">
+      <div class="inbox-head">
+        <b>${escapeHtml(s.title_ar)}</b>
+        <span class="inbox-time">${new Date(s.start_time).toLocaleString("ar-EG")}</span>
+      </div>
+      ${s.description ? `<div class="inbox-body">${escapeHtml(s.description)}</div>` : ""}
+      <div class="inbox-actions">
+        ${s.meet_link ? `<a href="${s.meet_link}" target="_blank" class="btn btn-teal btn-sm">فتح</a>` : ""}
+        <button class="icon-btn danger" onclick="deleteSchedule('${s.id}')">🗑️</button>
+      </div>
+    </div>`).join("");
+}
 
-function openMyTasks(e){
-  if(e) e.preventDefault();
-  showToast("🎯 قائمة المهام — قريبًا", "info", 3000);
+function openAdminScheduleForm(){
+  document.getElementById("form-modal-content").innerHTML = `
+    <button class="close" onclick="closeFormModal()">✕</button>
+    <h3>➕ إضافة حصة</h3>
+    <form id="schedule-form">
+      <div class="field"><label>عنوان الحصة</label><input type="text" id="sch-title" required></div>
+      <div class="field"><label>الوصف</label><textarea id="sch-desc" rows="2"></textarea></div>
+      <div class="field"><label>المرحلة</label>
+        <select id="sch-level"><option value="">الكل</option>${levelOptions()}</select></div>
+      <div class="field"><label>وقت البداية</label><input type="datetime-local" id="sch-start" required></div>
+      <div class="field"><label>رابط الحصة</label><input type="url" id="sch-link" placeholder="https://meet.google.com/..."></div>
+      <div class="field"><label>مباشر الآن؟</label>
+        <select id="sch-live">
+          <option value="false">لا</option>
+          <option value="true">نعم — مباشر 🔴</option>
+        </select></div>
+      <button class="btn btn-gold btn-block" type="submit">حفظ</button>
+      <div class="form-msg" id="sch-msg"></div>
+    </form>`;
+  document.getElementById("form-overlay").classList.add("open");
+  document.getElementById("schedule-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("sch-msg");
+    const payload = {
+      title_ar: document.getElementById("sch-title").value.trim(),
+      description: document.getElementById("sch-desc").value.trim(),
+      grade_level_id: document.getElementById("sch-level").value || null,
+      start_time: new Date(document.getElementById("sch-start").value).toISOString(),
+      meet_link: document.getElementById("sch-link").value.trim() || null,
+      is_live: document.getElementById("sch-live").value === "true"
+    };
+    const { error } = await supabaseClient.from("schedule").insert(payload);
+    if(error){ showMsg(msg, friendlyError(error), "error"); return; }
+    logOk("الحصة", "تمت الإضافة");
+    closeFormModal();
+    await loadAdminSchedule();
+  });
 }
-window.openMyTasks = openMyTasks;
 
-function openMySchedule(e){
-  if(e) e.preventDefault();
-  showToast("📅 جدول الحصص — قريبًا", "info", 3000);
+async function deleteSchedule(id){
+  if(!confirm("متأكدة؟")) return;
+  await supabaseClient.from("schedule").delete().eq("id", id);
+  await loadAdminSchedule();
 }
-window.openMySchedule = openMySchedule;
+window.loadMySchedule = loadMySchedule;
+window.loadAdminSchedule = loadAdminSchedule;
+window.openAdminScheduleForm = openAdminScheduleForm;
+window.deleteSchedule = deleteSchedule;
+
+/* ============================================================
+   Library
+   ============================================================ */
+async function loadMyLibrary(){
+  const list = document.getElementById("library-list");
+  if(!list) return;
+  list.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
+  const { data, error } = await supabaseClient.from("library_files")
+    .select("*").order("created_at", {ascending: false});
+  if(error || !data?.length){
+    list.innerHTML = `<div class="empty-state">لسه مفيش ملفات</div>`;
+    return;
+  }
+  list.innerHTML = `<div class="grid grid-3">` + data.map(f => `
+    <div class="card library-card">
+      <div class="library-icon">📄</div>
+      <h4>${escapeHtml(f.title_ar)}</h4>
+      ${f.description ? `<p>${escapeHtml(f.description)}</p>` : ""}
+      ${f.file_size_kb ? `<span class="library-size">${(f.file_size_kb/1024).toFixed(1)} MB</span>` : ""}
+      <a href="${f.file_url}" target="_blank" download class="btn btn-teal btn-block btn-sm">⬇️ تحميل</a>
+    </div>`).join("") + `</div>`;
+}
+
+async function loadAdminLibrary(){
+  const tbody = document.getElementById("admin-library-table");
+  if(!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">جاري التحميل...</div></td></tr>`;
+  const { data, error } = await supabaseClient.from("library_files")
+    .select("*, grade_levels(name_ar)").order("created_at", {ascending: false});
+  if(error || !data?.length){
+    tbody.innerHTML = `<tr><td colspan="4"><div class="empty-state">لسه مفيش ملفات</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(f => `
+    <tr>
+      <td>${escapeHtml(f.title_ar)}</td>
+      <td>${f.grade_levels?.name_ar || "الكل"}</td>
+      <td>${f.file_size_kb ? (f.file_size_kb/1024).toFixed(1)+" MB" : "—"}</td>
+      <td>
+        <a href="${f.file_url}" target="_blank" class="icon-btn">👁️</a>
+        <button class="icon-btn danger" onclick="deleteLibraryFile('${f.id}')">🗑️</button>
+      </td>
+    </tr>`).join("");
+}
+
+function openAdminLibraryForm(){
+  document.getElementById("form-modal-content").innerHTML = `
+    <button class="close" onclick="closeFormModal()">✕</button>
+    <h3>➕ إضافة ملف للمكتبة</h3>
+    <form id="library-form">
+      <div class="field"><label>اسم الملف</label><input type="text" id="lib-title" required></div>
+      <div class="field"><label>وصف مختصر</label><textarea id="lib-desc" rows="2"></textarea></div>
+      <div class="field"><label>المرحلة</label>
+        <select id="lib-level"><option value="">الكل</option>${levelOptions()}</select></div>
+      <div class="field" id="lib-file-field"><label>اختر الملف</label><input type="file" id="lib-file" required></div>
+      <button class="btn btn-gold btn-block" type="submit">حفظ</button>
+      <div class="form-msg" id="lib-msg"></div>
+    </form>`;
+  document.getElementById("form-overlay").classList.add("open");
+  document.getElementById("library-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("lib-msg");
+    const file = document.getElementById("lib-file").files[0];
+    if(!file){ showMsg(msg, "اختار ملف", "error"); return; }
+    showMsg(msg, "جاري الرفع...", "ok");
+    const path = `library/${Date.now()}_${file.name}`;
+    const { error: upErr } = await supabaseClient.storage.from(STORAGE_BUCKET).upload(path, file);
+    if(upErr){ showMsg(msg, friendlyError(upErr), "error"); return; }
+    const file_url = supabaseClient.storage.from(STORAGE_BUCKET).getPublicUrl(path).data.publicUrl;
+    const { error } = await supabaseClient.from("library_files").insert({
+      title_ar: document.getElementById("lib-title").value.trim(),
+      description: document.getElementById("lib-desc").value.trim(),
+      grade_level_id: document.getElementById("lib-level").value || null,
+      file_url,
+      file_size_kb: Math.round(file.size / 1024)
+    });
+    if(error){ showMsg(msg, friendlyError(error), "error"); return; }
+    logOk("الملف", "تمت الإضافة");
+    closeFormModal();
+    await loadAdminLibrary();
+  });
+}
+
+async function deleteLibraryFile(id){
+  if(!confirm("متأكدة؟")) return;
+  await supabaseClient.from("library_files").delete().eq("id", id);
+  await loadAdminLibrary();
+}
+window.loadMyLibrary = loadMyLibrary;
+window.loadAdminLibrary = loadAdminLibrary;
+window.openAdminLibraryForm = openAdminLibraryForm;
+window.deleteLibraryFile = deleteLibraryFile;
+
+/* ============================================================
+   Certificates
+   ============================================================ */
+async function loadMyCertificates(){
+  const list = document.getElementById("certificates-list");
+  if(!list) return;
+  list.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
+  const { data: courses } = await supabaseClient.from("courses")
+    .select("*").eq("grade_level_id", CURRENT_PROFILE.grade_level_id);
+  if(!courses?.length){
+    list.innerHTML = `<div class="empty-state">لسه مفيش كورسات</div>`;
+    return;
+  }
+  const certs = [];
+  for(const course of courses){
+    const { data: lessons } = await supabaseClient.from("lessons").select("id").eq("course_id", course.id);
+    const { data: progress } = await supabaseClient.from("lesson_progress")
+      .select("lesson_id").eq("student_id", CURRENT_PROFILE.id).eq("watched", true);
+    const lessonIds = (lessons||[]).map(l => l.id);
+    const watched = (progress||[]).filter(p => lessonIds.includes(p.lesson_id)).length;
+    const total = lessonIds.length;
+    const pct = total ? Math.round((watched/total)*100) : 0;
+    if(pct >= 80) certs.push({ course, pct });
+  }
+  if(!certs.length){
+    list.innerHTML = `<div class="empty-state">لازم تكمّل 80% من كورس عشان تحصل على شهادة 🎓</div>`;
+    return;
+  }
+  list.innerHTML = `<div class="grid grid-3">` + certs.map(c => `
+    <div class="card cert-card">
+      <div class="cert-icon">🏆</div>
+      <h4>${escapeHtml(c.course.title_ar)}</h4>
+      <p>${c.pct}% مكتمل</p>
+      <button class="btn btn-gold btn-block btn-sm" onclick='openCertificate("${c.course.id}")'>📜 عرض الشهادة</button>
+    </div>`).join("") + `</div>`;
+}
+window.loadMyCertificates = loadMyCertificates;
+
+/* ============================================================
+   Points
+   ============================================================ */
+async function loadMyPoints(){
+  const content = document.getElementById("student-points-content");
+  if(!content) return;
+  content.innerHTML = `<div class="empty-state">جاري التحميل...</div>`;
+  const { data } = await supabaseClient.from("student_points")
+    .select("*").eq("student_id", CURRENT_PROFILE.id).maybeSingle();
+  const points = data?.points || 0;
+  const badges = data?.badges || [];
+  const level = points >= 1000 ? "🏆 أسطورة" :
+                points >= 500 ? "👑 ذهبي" :
+                points >= 200 ? "🌟 فضي" :
+                points >= 50 ? "⭐ برونزي" :
+                "🎯 مبتدئ";
+  content.innerHTML = `
+    <div class="card" style="text-align:center;padding:40px;">
+      <div style="font-size:80px;margin-bottom:16px;">${level.split(" ")[0]}</div>
+      <h2 style="color:var(--navy-deep);font-size:44px;margin:0;">${points}</h2>
+      <p style="color:var(--ink-soft);">نقطة</p>
+      <div style="margin-top:20px;padding:14px;background:var(--paper-2);border-radius:12px;display:inline-block;">
+        <b>المستوى:</b> ${level}
+      </div>
+    </div>
+    ${badges.length ? `
+      <div class="card" style="margin-top:20px;">
+        <h3>🏅 الشارات</h3>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          ${badges.map(b => `<span class="badge-chip">${escapeHtml(b)}</span>`).join("")}
+        </div>
+      </div>` : ""}`;
+}
+window.loadMyPoints = loadMyPoints;
+
+/* ============================================================
+   Discounts
+   ============================================================ */
+async function loadAdminDiscounts(){
+  const tbody = document.getElementById("admin-discounts-table");
+  if(!tbody) return;
+  tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">جاري التحميل...</div></td></tr>`;
+  const { data, error } = await supabaseClient.from("discount_codes")
+    .select("*").order("created_at", {ascending: false});
+  if(error || !data?.length){
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">لسه مفيش أكواد</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(d => `
+    <tr>
+      <td><b>${escapeHtml(d.code)}</b></td>
+      <td>${d.discount_percent}%</td>
+      <td>${d.used_count}/${d.max_uses}</td>
+      <td>${d.expires_at ? new Date(d.expires_at).toLocaleDateString("ar-EG") : "—"}</td>
+      <td><button class="icon-btn danger" onclick="deleteDiscount('${d.id}')">🗑️</button></td>
+    </tr>`).join("");
+}
+function openAdminDiscountForm(){
+  document.getElementById("form-modal-content").innerHTML = `
+    <button class="close" onclick="closeFormModal()">✕</button>
+    <h3>➕ إضافة كود خصم</h3>
+    <form id="discount-form">
+      <div class="field"><label>الكود</label><input type="text" id="dc-code" required placeholder="مثال: SAVE20"></div>
+      <div class="field"><label>نسبة الخصم %</label><input type="number" id="dc-percent" min="1" max="100" value="10" required></div>
+      <div class="field"><label>الحد الأقصى للاستخدام</label><input type="number" id="dc-max" value="100"></div>
+      <div class="field"><label>ينتهي في (اختياري)</label><input type="date" id="dc-expires"></div>
+      <button class="btn btn-gold btn-block" type="submit">حفظ</button>
+      <div class="form-msg" id="dc-msg"></div>
+    </form>`;
+  document.getElementById("form-overlay").classList.add("open");
+  document.getElementById("discount-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("dc-msg");
+    const { error } = await supabaseClient.from("discount_codes").insert({
+      code: document.getElementById("dc-code").value.trim().toUpperCase(),
+      discount_percent: Number(document.getElementById("dc-percent").value),
+      max_uses: Number(document.getElementById("dc-max").value) || 100,
+      expires_at: document.getElementById("dc-expires").value || null
+    });
+    if(error){ showMsg(msg, friendlyError(error), "error"); return; }
+    closeFormModal();
+    await loadAdminDiscounts();
+  });
+}
+async function deleteDiscount(id){
+  if(!confirm("متأكدة؟")) return;
+  await supabaseClient.from("discount_codes").delete().eq("id", id);
+  await loadAdminDiscounts();
+}
+window.loadAdminDiscounts = loadAdminDiscounts;
+window.openAdminDiscountForm = openAdminDiscountForm;
+window.deleteDiscount = deleteDiscount;
 
 /* ============================================================
    Packages
@@ -1413,20 +1662,6 @@ function openSubscriptionForm(studentId,studentName){
 }
 
 /* ============================================================
-   Schedule & Discounts (simple stubs)
-   ============================================================ */
-async function loadSchedule(){
-  const list = document.getElementById("schedule-list");
-  if(!list) return;
-  list.innerHTML = `<div class="empty-state">ميزة جدول الحصص قريبًا 📅</div>`;
-}
-async function loadDiscounts(){
-  const tbody = document.getElementById("discounts-table");
-  if(!tbody) return;
-  tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">ميزة أكواد الخصم قريبًا 🎁</div></td></tr>`;
-}
-
-/* ============================================================
    Settings
    ============================================================ */
 async function loadOwnerSettings(){
@@ -1459,7 +1694,30 @@ async function deleteRow(table,id,refreshFn){
 }
 
 /* ============================================================
-   Course Card for Students
+   Search + Filters
+   ============================================================ */
+function filterCourses(){
+  const q = (document.getElementById("search-input")?.value || "").toLowerCase();
+  const cards = document.querySelectorAll("#packages-grid .course-card, #levels-grid .course-card");
+  cards.forEach(card => {
+    const t = (card.querySelector("h3")?.textContent || "").toLowerCase();
+    card.style.display = t.includes(q) ? "" : "none";
+  });
+}
+window.filterCourses = filterCourses;
+
+function filterStudentCourses(){
+  const q = (document.getElementById("student-search-input")?.value || "").toLowerCase();
+  const cards = document.querySelectorAll("#courses-grid .course-card");
+  cards.forEach(card => {
+    const t = (card.querySelector("h3")?.textContent || "").toLowerCase();
+    card.style.display = t.includes(q) ? "" : "none";
+  });
+}
+window.filterStudentCourses = filterStudentCourses;
+
+/* ============================================================
+   Course Card (Student)
    ============================================================ */
 function buildCourseCard(course, lang){
   const title = lang === "ar" ? course.title_ar : (course.title_en || course.title_ar);
@@ -1481,8 +1739,7 @@ function buildCourseCard(course, lang){
       <div class="course-body">
         <h3>${title}</h3>
         <p>${desc}</p>
-        <button class="btn btn-teal btn-block" onclick='openCoursePlayer("${course.id}", ${JSON.stringify(title)})'>🎬 مشاهدة الكورس</button>
-        <button class="btn btn-ghost btn-block btn-sm" style="margin-top:6px;" onclick='openCommentsModal("${course.id}", ${JSON.stringify(title)})'>💬 التعليقات</button>
+        <button class="btn btn-teal btn-block" onclick='openCoursePlayer("${course.id}", ${JSON.stringify(title)})'>🎬 مشاهدة</button>
       </div>
     </div>`;
 }
@@ -1497,7 +1754,6 @@ async function loadStudentDashboard(profile){
   const greetEmoji = isFemale ? "👸" : "🤵";
   document.getElementById("welcome-msg").textContent = `${greetEmoji} أهلاً بيك${isFemale ? "ِ" : ""} يا ${greetWord} ${profile.full_name}`;
 
-  // Points
   const { data: pts } = await supabaseClient.from("student_points").select("*").eq("student_id", profile.id).maybeSingle();
   const pointsEl = document.getElementById("student-points");
   if(pointsEl) pointsEl.textContent = pts?.points || 0;
@@ -1526,10 +1782,37 @@ async function loadStudentDashboard(profile){
 }
 
 /* ============================================================
+   Student Tabs
+   ============================================================ */
+function wireStudentTabs(){
+  document.querySelectorAll("#view-student .nav-link[data-tab]").forEach(link => {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      document.querySelectorAll("#view-student .nav-link[data-tab]").forEach(l => l.classList.remove("active"));
+      link.classList.add("active");
+      document.querySelectorAll("#view-student .tab-panel").forEach(p => p.hidden = true);
+      const target = document.getElementById("panel-" + link.dataset.tab);
+      if(target) target.hidden = false;
+      const tab = link.dataset.tab;
+      if(tab === "my-tasks") loadMyTasks();
+      if(tab === "my-schedule") loadMySchedule();
+      if(tab === "my-library") loadMyLibrary();
+            if(tab === "my-certificates") loadMyCertificates();
+      if(tab === "my-points") loadMyPoints();
+    });
+  });
+}
+
+/* ============================================================
    Init
    ============================================================ */
 async function initApp(){
   showWelcomeModalIfNeeded();
+
+  const savedDark = localStorage.getItem("basetna_dark") === "1";
+  applyDarkMode(savedDark);
+  const savedTheme = localStorage.getItem("basetna_theme") || "default";
+  applyStudentTheme(savedTheme);
 
   const {data:{session},error:sessErr}=await supabaseClient.auth.getSession();
   if(sessErr){logError("فحص الجلسة",sessErr);showView("public");await loadHome();await wireWhatsAppButton();updateWelcomeText();return;}
@@ -1549,9 +1832,11 @@ async function initApp(){
 
   if(isYassen && !VIEW_MODE){
     showView("owner");
+    applyRoleMode();
     setTimeout(() => showRolePicker(), 500);
     return;
   }
+
   applyRoleMode();
   const effectiveRole = CURRENT_PROFILE.effectiveRole || CURRENT_PROFILE.role;
 
@@ -1564,6 +1849,7 @@ async function initApp(){
     await refreshOwnerData();
   } else {
     showView("student");
+    wireStudentTabs();
     hideSupportFabsForRole("student");
     await loadStudentDashboard(CURRENT_PROFILE);
   }
@@ -1573,15 +1859,27 @@ async function initApp(){
 }
 
 /* ============================================================
-   ربط كل الأزرار
+   DOMContentLoaded
    ============================================================ */
-function wireAllEvents(){
-  console.log("🔗 Wiring all events...");
+document.addEventListener("DOMContentLoaded", async () => {
+  console.log("🚀 DOMContentLoaded");
 
-  // Dark mode
-  document.querySelectorAll(".theme-btn").forEach(btn => {
-    btn.replaceWith(btn.cloneNode(true));
+  // Init dark + theme + lang
+  const savedDark = localStorage.getItem("basetna_dark") === "1";
+  applyDarkMode(savedDark);
+  const savedTheme = localStorage.getItem("basetna_theme") || "default";
+  applyStudentTheme(savedTheme);
+  applyLanguage(localStorage.getItem("basetna_lang") || "ar");
+
+  // Lang switch buttons
+  document.querySelectorAll(".lang-switch").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggleLanguage();
+    });
   });
+
+  // Theme buttons
   document.querySelectorAll(".theme-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -1599,21 +1897,12 @@ function wireAllEvents(){
     });
   }
 
-  // Lang switch
-  document.querySelectorAll(".lang-switch").forEach(btn => {
-    btn.replaceWith(btn.cloneNode(true));
-  });
-  document.querySelectorAll(".lang-switch").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      toggleLanguage();
-    });
-  });
+  // Login form
+  document.getElementById("login-form")?.addEventListener("submit", handleLogin);
+  // Settings form
+  document.getElementById("settings-form")?.addEventListener("submit", saveSettings);
 
   // Logout
-  document.querySelectorAll(".logout").forEach(el => {
-    el.replaceWith(el.cloneNode(true));
-  });
   document.querySelectorAll(".logout").forEach(el => {
     el.addEventListener("click", (e) => {
       e.preventDefault();
@@ -1621,68 +1910,32 @@ function wireAllEvents(){
     });
   });
 
-  // Login form
-  const loginForm = document.getElementById("login-form");
-  if(loginForm && !loginForm.dataset.bound){
-    loginForm.addEventListener("submit", handleLogin);
-    loginForm.dataset.bound = "1";
-  }
+  // Support
+  document.getElementById("support-send")?.addEventListener("click", sendSupportMessage);
+  document.getElementById("support-input")?.addEventListener("keydown", e => {
+    if(e.key === "Enter" && !e.shiftKey){
+      e.preventDefault();
+      sendSupportMessage();
+    }
+  });
+  document.getElementById("support-close")?.addEventListener("click", closeSupportPanel);
 
-  // Settings form
-  const settingsForm = document.getElementById("settings-form");
-  if(settingsForm && !settingsForm.dataset.bound){
-    settingsForm.addEventListener("submit", saveSettings);
-    settingsForm.dataset.bound = "1";
-  }
+  // Search inputs
+  document.getElementById("search-input")?.addEventListener("input", filterCourses);
+  document.getElementById("student-search-input")?.addEventListener("input", filterStudentCourses);
 
-  // Support send
-  const supportSend = document.getElementById("support-send");
-  if(supportSend && !supportSend.dataset.bound){
-    supportSend.addEventListener("click", sendSupportMessage);
-    supportSend.dataset.bound = "1";
-  }
-
-  const supportInput = document.getElementById("support-input");
-  if(supportInput && !supportInput.dataset.bound){
-    supportInput.addEventListener("keydown", e => {
-      if(e.key === "Enter" && !e.shiftKey){
-        e.preventDefault();
-        sendSupportMessage();
-      }
-    });
-    supportInput.dataset.bound = "1";
-  }
-
-  const supportClose = document.getElementById("support-close");
-  if(supportClose && !supportClose.dataset.bound){
-    supportClose.addEventListener("click", closeSupportPanel);
-    supportClose.dataset.bound = "1";
-  }
-
-  console.log("✅ All events wired");
-}
-
-document.addEventListener("DOMContentLoaded", async () => {
-  console.log("🚀 DOMContentLoaded");
-
-  // Init dark mode
-  const savedDark = localStorage.getItem("basetna_dark") === "1";
-  applyDarkMode(savedDark);
-
-  // Init theme
-  const savedTheme = localStorage.getItem("basetna_theme") || "default";
-  applyStudentTheme(savedTheme);
-
-  // Init language
-  applyLanguage(localStorage.getItem("basetna_lang") || "ar");
-
-  // Wire events
-  wireAllEvents();
+  // Filters
+  document.getElementById("filter-level")?.addEventListener("change", filterCourses);
+  document.getElementById("filter-sort")?.addEventListener("change", filterCourses);
 
   watchOwnerField();
-
   await initApp();
-
-  // Rewire after initApp (لأن العناصر بتظهر ديناميكيًا)
-  setTimeout(wireAllEvents, 500);
 });
+
+window.addEventListener("unhandledrejection", (e) => {
+  console.error("❌ Unhandled:", e.reason);
+});
+
+/* Expose for debugging */
+window.supabaseClient = supabaseClient;
+window.CURRENT_PROFILE = () => CURRENT_PROFILE;

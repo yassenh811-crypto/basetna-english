@@ -47,21 +47,19 @@
     </div>
   </section>
 
-  <!-- #4 الفلترة المتقدمة -->
   <section class="block" id="search-section" style="padding:30px 0;">
     <div class="container">
       <div class="search-box">
-        <input type="text" id="search-input" placeholder="🔍 ابحث في الكورسات..." oninput="filterCourses()">
+        <input type="text" id="search-input" placeholder="🔍 ابحث في الكورسات...">
       </div>
-      <div class="filter-row" style="margin-top:14px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;">
-        <select id="filter-level" onchange="filterCourses()" class="filter-select">
+      <div class="filter-row">
+        <select id="filter-level" class="filter-select">
           <option value="">كل المراحل</option>
         </select>
-        <select id="filter-sort" onchange="filterCourses()" class="filter-select">
+        <select id="filter-sort" class="filter-select">
           <option value="newest">الأحدث</option>
           <option value="oldest">الأقدم</option>
           <option value="rating">الأعلى تقييمًا</option>
-          <option value="popular">الأكثر شعبية</option>
         </select>
       </div>
     </div>
@@ -81,7 +79,6 @@
     </div>
   </section>
 
-  <!-- #19 المساعد الذكي -->
   <button class="ai-fab" onclick="openAIAssistant()" title="المساعد الذكي">🤖</button>
 
   <footer><div class="container">
@@ -148,8 +145,8 @@
     <form id="login-form">
       <h3>تسجيل الدخول</h3>
       <p class="sub">أهلاً بيك تاني 👋</p>
-      <div class="field"><label>البريد / اسم المستخدم</label><input type="text" id="li-username" autocomplete="username" required></div>
-      <div class="field"><label>كلمة المرور</label><input type="password" id="li-password" autocomplete="current-password" required></div>
+      <div class="field"><label>البريد / اسم المستخدم</label><input type="text" id="li-username" required></div>
+      <div class="field"><label>كلمة المرور</label><input type="password" id="li-password" required></div>
       <div class="field" id="serial-field" hidden><label>الرقم التسلسلي</label><input type="text" id="li-serial"></div>
       <button class="btn btn-gold btn-block" type="submit">دخول</button>
       <div class="form-msg" id="login-msg"></div>
@@ -158,7 +155,7 @@
 </div>
 
 <!-- ============================================================
-     VIEW 2: OWNER / SUPPORT
+     VIEW 2: OWNER DASHBOARD
      ============================================================ -->
 <div id="view-owner" hidden>
   <div class="dash-shell">
@@ -169,22 +166,21 @@
 
       <a href="#" class="nav-link active" data-tab="overview">نظرة عامة</a>
       <a href="#" class="nav-link" data-tab="stats">📊 التقارير</a>
-      <a href="#" class="nav-link" data-tab="analytics">📈 تحليلات متقدمة</a>
+      <a href="#" class="nav-link" data-tab="analytics">📈 تحليلات</a>
       <a href="#" class="nav-link" data-tab="levels">المراحل الدراسية</a>
       <a href="#" class="nav-link" data-tab="courses">الكورسات</a>
       <a href="#" class="nav-link" data-tab="packages">الباقات</a>
       <a href="#" class="nav-link" data-tab="students">الطلاب والاشتراكات</a>
+      <a href="#" class="nav-link" data-tab="manage-tasks">🎯 إدارة المهام</a>
+      <a href="#" class="nav-link" data-tab="manage-schedule">📅 إدارة الحصص</a>
+      <a href="#" class="nav-link" data-tab="manage-library">📚 إدارة المكتبة</a>
+      <a href="#" class="nav-link" data-tab="manage-discounts">🎁 أكواد الخصم</a>
       <a href="#" class="nav-link" data-tab="chats">💬 المحادثات</a>
-      <a href="#" class="nav-link" data-tab="inbox">📥 صندوق الرسائل <span class="notif-badge" id="inbox-badge" hidden>0</span></a>
-      <a href="#" class="nav-link" data-tab="schedule">📅 جدول الحصص</a>
-      <a href="#" class="nav-link" data-tab="discounts">🎁 أكواد الخصم</a>
-      <a href="#" class="nav-link" data-tab="settings">الإعدادات</a>
+      <a href="#" class="nav-link" data-tab="inbox">📥 صندوق الرسائل</a>
+      <a href="#" class="nav-link" data-tab="settings">⚙️ الإعدادات</a>
 
       <div class="sidebar-bottom">
-        <button class="role-toggle-btn" style="background:linear-gradient(135deg,#E91E63,#1976D2);"
-                onclick="showWelcomePickerAgain()">
-          👋 تغيير نوع الترحيب
-        </button>
+        <button class="role-toggle-btn" style="background:linear-gradient(135deg,#E91E63,#1976D2);" onclick="showWelcomePickerAgain()">👋 تغيير نوع الترحيب</button>
         <button class="theme-btn sidebar-theme-btn" onclick="toggleDarkMode()">🌙 الوضع الليلي</button>
         <button class="lang-switch">English</button>
         <a href="#" class="logout">تسجيل الخروج</a>
@@ -210,12 +206,12 @@
 
       <!-- Stats -->
       <section class="tab-panel" id="panel-stats" hidden>
-        <div class="dash-head"><h1>📊 التقارير والإحصائيات</h1>
+        <div class="dash-head"><h1>📊 التقارير</h1>
           <button class="btn btn-gold btn-sm" onclick="loadStats()">🔄 تحديث</button></div>
         <div id="stats-content"><div class="empty-state">جاري التحميل...</div></div>
       </section>
 
-      <!-- Advanced Analytics (#20) -->
+      <!-- Analytics -->
       <section class="tab-panel" id="panel-analytics" hidden>
         <div class="dash-head"><h1>📈 تحليلات متقدمة</h1>
           <button class="btn btn-gold btn-sm" onclick="loadAnalytics()">🔄 تحديث</button></div>
@@ -252,10 +248,44 @@
       <!-- Students -->
       <section class="tab-panel" id="panel-students" hidden>
         <div class="dash-head"><h1>الطلاب والاشتراكات</h1>
-          <button class="btn btn-gold btn-sm" onclick="openAddStudentForm()">+ إضافة حساب طالب</button></div>
+          <button class="btn btn-gold btn-sm" onclick="openAddStudentForm()">+ إضافة طالب</button></div>
         <div class="table-wrap"><table><thead><tr>
           <th>اسم الطالب</th><th>الهاتف</th><th>المرحلة</th><th>الحالة</th><th>ينتهي في</th><th>إجراءات</th>
         </tr></thead><tbody id="students-table"></tbody></table></div>
+      </section>
+
+      <!-- Manage Tasks -->
+      <section class="tab-panel" id="panel-manage-tasks" hidden>
+        <div class="dash-head"><h1>🎯 إدارة مهام الطلاب</h1>
+          <button class="btn btn-gold btn-sm" onclick="openAdminTaskForm()">+ إضافة مهمة</button></div>
+        <div class="table-wrap"><table><thead><tr>
+          <th>المهمة</th><th>الطالب</th><th>المرحلة</th><th>الحالة</th><th>إجراءات</th>
+        </tr></thead><tbody id="admin-tasks-table"></tbody></table></div>
+      </section>
+
+      <!-- Manage Schedule -->
+      <section class="tab-panel" id="panel-manage-schedule" hidden>
+        <div class="dash-head"><h1>📅 إدارة الحصص</h1>
+          <button class="btn btn-gold btn-sm" onclick="openAdminScheduleForm()">+ إضافة حصة</button></div>
+        <div id="admin-schedule-list"><div class="empty-state">جاري التحميل...</div></div>
+      </section>
+
+      <!-- Manage Library -->
+      <section class="tab-panel" id="panel-manage-library" hidden>
+        <div class="dash-head"><h1>📚 إدارة المكتبة</h1>
+          <button class="btn btn-gold btn-sm" onclick="openAdminLibraryForm()">+ إضافة ملف</button></div>
+        <div class="table-wrap"><table><thead><tr>
+          <th>الملف</th><th>المرحلة</th><th>الحجم</th><th>إجراءات</th>
+        </tr></thead><tbody id="admin-library-table"></tbody></table></div>
+      </section>
+
+      <!-- Manage Discounts -->
+      <section class="tab-panel" id="panel-manage-discounts" hidden>
+        <div class="dash-head"><h1>🎁 أكواد الخصم</h1>
+          <button class="btn btn-gold btn-sm" onclick="openAdminDiscountForm()">+ إضافة كود</button></div>
+        <div class="table-wrap"><table><thead><tr>
+          <th>الكود</th><th>النسبة</th><th>الاستخدامات</th><th>ينتهي</th><th>إجراءات</th>
+        </tr></thead><tbody id="admin-discounts-table"></tbody></table></div>
       </section>
 
       <!-- Chats -->
@@ -272,25 +302,9 @@
         <div id="inbox-list"><div class="empty-state">جاري التحميل...</div></div>
       </section>
 
-      <!-- Schedule (#7) -->
-      <section class="tab-panel" id="panel-schedule" hidden>
-        <div class="dash-head"><h1>📅 جدول الحصص المباشرة</h1>
-          <button class="btn btn-gold btn-sm" onclick="openScheduleForm()">+ إضافة حصة</button></div>
-        <div id="schedule-list"><div class="empty-state">جاري التحميل...</div></div>
-      </section>
-
-      <!-- Discounts (#6) -->
-      <section class="tab-panel" id="panel-discounts" hidden>
-        <div class="dash-head"><h1>🎁 أكواد الخصم</h1>
-          <button class="btn btn-gold btn-sm" onclick="openDiscountForm()">+ إضافة كود</button></div>
-        <div class="table-wrap"><table><thead><tr>
-          <th>الكود</th><th>النسبة</th><th>الاستخدامات</th><th>ينتهي</th><th>إجراءات</th>
-        </tr></thead><tbody id="discounts-table"></tbody></table></div>
-      </section>
-
       <!-- Settings -->
       <section class="tab-panel" id="panel-settings" hidden>
-        <div class="dash-head"><h1>الإعدادات</h1></div>
+        <div class="dash-head"><h1>⚙️ الإعدادات</h1></div>
         <div class="card" style="max-width:520px;">
           <form id="settings-form">
             <div class="field"><label>اسم الأونر</label><input type="text" id="set-owner-name" value="ms. sherehan ali"></div>
@@ -309,27 +323,26 @@
 </div>
 
 <!-- ============================================================
-     VIEW 3: STUDENT
+     VIEW 3: STUDENT DASHBOARD
      ============================================================ -->
 <div id="view-student" hidden>
   <div class="dash-shell">
     <aside class="sidebar">
       <div class="brand"><span class="mark">EN</span> بسّطنا الإنجليزي</div>
-      <a href="#" class="active">كورساتي</a>
-      <a href="#" onclick="openMyLibrary(event)">📚 مكتبتي</a>
-      <a href="#" onclick="openMyCertificates(event)">📜 شهاداتي</a>
-      <a href="#" onclick="openMyTasks(event)">🎯 مهامي</a>
-      <a href="#" onclick="openMySchedule(event)">📅 جدولي</a>
-      <a href="#" onclick="openMyPoints(event)">🏆 نقاطي</a>
+      <a href="#" class="nav-link active" data-tab="my-courses">كورساتي</a>
+      <a href="#" class="nav-link" data-tab="my-tasks">🎯 المهم</a>
+      <a href="#" class="nav-link" data-tab="my-schedule">📅 جدولي</a>
+      <a href="#" class="nav-link" data-tab="my-library">📚 مكتبتي</a>
+      <a href="#" class="nav-link" data-tab="my-certificates">📜 شهاداتي</a>
+      <a href="#" class="nav-link" data-tab="my-points">🏆 نقاطي</a>
 
       <div class="sidebar-bottom">
         <button class="notif-btn" onclick="openNotifications()" title="الإشعارات">
           🔔 <span class="notif-badge" id="student-notif-count" hidden>0</span>
         </button>
-        <button class="role-toggle-btn" style="background:linear-gradient(135deg,#E91E63,#1976D2);"
-                onclick="showWelcomePickerAgain()">👋 تغيير نوع الترحيب</button>
+        <button class="role-toggle-btn" style="background:linear-gradient(135deg,#E91E63,#1976D2);" onclick="showWelcomePickerAgain()">👋 تغيير نوع الترحيب</button>
         <button class="theme-btn sidebar-theme-btn" onclick="toggleDarkMode()">🌙 الوضع الليلي</button>
-        <select id="student-theme-picker" onchange="applyStudentTheme(this.value)" class="theme-picker">
+        <select id="student-theme-picker" class="theme-picker" onchange="applyStudentTheme(this.value)">
           <option value="default">🎨 الثيم الافتراضي</option>
           <option value="pink">💗 وردي</option>
           <option value="blue">💙 أزرق</option>
@@ -340,26 +353,57 @@
         <a href="#" class="logout">تسجيل الخروج</a>
       </div>
     </aside>
+
     <main class="dash-main">
-      <div class="dash-head">
-        <h1 id="welcome-msg">أهلاً بيك 👋</h1>
-        <span class="badge" id="sub-badge">—</span>
-      </div>
+      <!-- Tab 1: My Courses -->
+      <section class="tab-panel" id="panel-my-courses">
+        <div class="dash-head">
+          <h1 id="welcome-msg">أهلاً بيك 👋</h1>
+          <span class="badge" id="sub-badge">—</span>
+        </div>
+        <div class="points-bar">
+          🏆 <b id="student-points">0</b> نقطة
+        </div>
+        <div id="no-sub-notice" class="card" style="display:none; margin-bottom:24px; border-top:4px solid var(--danger);">
+          <p style="margin:0 0 12px;">مفيش اشتراك فعّال. تواصلي مع مس. شيرهان.</p>
+          <a href="#" id="no-sub-wa-btn" class="btn btn-teal" target="_blank">تواصل على واتساب</a>
+        </div>
+        <div class="search-box" style="margin-bottom:20px;max-width:100%;">
+          <input type="text" id="student-search-input" placeholder="🔍 ابحث في كورساتك...">
+        </div>
+        <div class="grid grid-3" id="courses-grid"></div>
+      </section>
 
-      <!-- Points (#8) -->
-      <div class="points-bar" id="points-bar">
-        🏆 <b id="student-points">0</b> نقطة · <span id="student-badges"></span>
-      </div>
+      <!-- Tab 2: My Tasks -->
+      <section class="tab-panel" id="panel-my-tasks" hidden>
+        <div class="dash-head"><h1>🎯 قائمة المهام</h1>
+          <button class="btn btn-gold btn-sm" onclick="openAddTaskForm()">+ إضافة مهمة</button></div>
+        <div id="tasks-list"><div class="empty-state">جاري التحميل...</div></div>
+      </section>
 
-      <div id="no-sub-notice" class="card" style="display:none; margin-bottom:24px; border-top:4px solid var(--danger);">
-        <p style="margin:0 0 12px;">مفيش اشتراك فعّال. تواصلي مع مس. شيرهان.</p>
-        <a href="#" id="no-sub-wa-btn" class="btn btn-teal" target="_blank">تواصل على واتساب</a>
-      </div>
+      <!-- Tab 3: My Schedule -->
+      <section class="tab-panel" id="panel-my-schedule" hidden>
+        <div class="dash-head"><h1>📅 جدولي</h1></div>
+        <div id="student-schedule-list"><div class="empty-state">جاري التحميل...</div></div>
+      </section>
 
-      <div class="search-box" style="margin-bottom:20px;max-width:100%;">
-        <input type="text" id="student-search-input" placeholder="🔍 ابحث في كورساتك..." oninput="filterStudentCourses()">
-      </div>
-      <div class="grid grid-3" id="courses-grid"></div>
+      <!-- Tab 4: My Library -->
+      <section class="tab-panel" id="panel-my-library" hidden>
+        <div class="dash-head"><h1>📚 مكتبتي</h1></div>
+        <div id="library-list"><div class="empty-state">جاري التحميل...</div></div>
+      </section>
+
+      <!-- Tab 5: My Certificates -->
+      <section class="tab-panel" id="panel-my-certificates" hidden>
+        <div class="dash-head"><h1>📜 شهاداتي</h1></div>
+        <div id="certificates-list"><div class="empty-state">جاري التحميل...</div></div>
+      </section>
+
+      <!-- Tab 6: My Points -->
+      <section class="tab-panel" id="panel-my-points" hidden>
+        <div class="dash-head"><h1>🏆 نقاطي وشاراتي</h1></div>
+        <div id="student-points-content"><div class="empty-state">جاري التحميل...</div></div>
+      </section>
     </main>
   </div>
 </div>
@@ -373,9 +417,7 @@
   <button class="support-fab support-fab-support" onclick="openSupportPanel('support')" title="الدعم الفني"><span>🛠️</span><span class="fab-label">دعم فني</span></button>
 </div>
 
-<!-- ============================================================
-     SUPPORT MODAL
-     ============================================================ -->
+<!-- Support Modal -->
 <div class="overlay" id="support-overlay">
   <div class="support-modal">
     <button class="close" id="support-close">✕</button>
@@ -396,9 +438,7 @@
   </div>
 </div>
 
-<!-- ============================================================
-     COURSE PLAYER MODAL
-     ============================================================ -->
+<!-- Course Player Modal -->
 <div class="overlay" id="course-player-overlay">
   <div class="course-player-modal">
     <button class="close" onclick="closeCoursePlayer()">✕</button>
@@ -417,7 +457,7 @@
   </div>
 </div>
 
-<!-- #5 Comments Modal -->
+<!-- Comments Modal -->
 <div class="overlay" id="comments-overlay">
   <div class="modal">
     <button class="close" onclick="closeComments()">✕</button>
@@ -428,7 +468,7 @@
   </div>
 </div>
 
-<!-- #3 Notifications Panel -->
+<!-- Notifications Panel -->
 <div class="overlay" id="notif-overlay">
   <div class="modal">
     <button class="close" onclick="closeNotifications()">✕</button>
@@ -437,7 +477,7 @@
   </div>
 </div>
 
-<!-- #19 AI Assistant Panel -->
+<!-- AI Assistant -->
 <div class="overlay" id="ai-overlay">
   <div class="modal">
     <button class="close" onclick="closeAIAssistant()">✕</button>
@@ -451,16 +491,7 @@
   </div>
 </div>
 
-<!-- #11 Quiz Modal -->
-<div class="overlay" id="quiz-overlay">
-  <div class="modal">
-    <button class="close" onclick="closeQuiz()">✕</button>
-    <h3 id="quiz-title">📝 اختبار سريع</h3>
-    <div id="quiz-body"></div>
-  </div>
-</div>
-
-<!-- #12 Certificate Modal -->
+<!-- Certificate Modal -->
 <div class="overlay" id="cert-overlay">
   <div class="modal" style="max-width:640px;">
     <button class="close" onclick="closeCertificate()">✕</button>

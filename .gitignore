@@ -1,4 +1,11 @@
 .DS_Store
 node_modules/
 .env
+.env.local
 *.log
+secrets.json
+*.key
+*.pem
+dist/
+build/
+.cache/

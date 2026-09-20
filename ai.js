@@ -16,9 +16,9 @@
      ============================================================ */
 
   /* فاضي = السيرفر هو نفسه اللي بيقدّم الموقع (الوضع العادي).
-     لو الموقع على GitHub Pages والسيرفر على استضافة تانية،
+     لو الموقع على GitHub Pages والسيرفر على استضافة تانية，
      اكتب رابط السيرفر هنا، مثال: "https://basetna-ai.onrender.com" */
-  const API_URL = "";
+  const API_URL = "https://basetna-english.vercel.app/api/health";
 
   const UI = {
     assistantName: "مساعد بسّطنا 🤖",

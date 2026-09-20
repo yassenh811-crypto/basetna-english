@@ -18,8 +18,7 @@
   /* فاضي = السيرفر هو نفسه اللي بيقدّم الموقع (الوضع العادي).
      لو الموقع على GitHub Pages والسيرفر على استضافة تانية，
      اكتب رابط السيرفر هنا، مثال: "https://basetna-ai.onrender.com" */
-  const API_URL = "https://basetna-english.vercel.app/api/health";
-
+ const API_URL = "https://basetna-english.vercel.app";
   const UI = {
     assistantName: "مساعد بسّطنا 🤖",
     greeting: "أهلاً! 👋 أنا مساعد «بسّطنا الإنجليزي».\nاسألني في أي حاجة في الإنجليزي: قواعد، ترجمة، تمارين، أو حتى مساعدة في استخدام الموقع.",

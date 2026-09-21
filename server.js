@@ -1,9 +1,10 @@
 /* ============================================================
-   🖥️ server.js — سيرفر المساعد الذكي (بدون مكتبات خارجية)
+   🖥️ server.js — سيرفر المساعد الذكي
    ------------------------------------------------------------
-   - بيستخدم fetch مباشر للـ Gemini API
-   - بيدعم أكتر من مفتاح (Key Rotation)
-   - بيقرأ المفاتيح من .env
+   - بيقرأ كل المفاتيح من .env (GEMINI_API_KEY_1, _2, _3...)
+   - نظام تدوير ذكي: لو مفتاح خلص، يروح للتاني
+   - المفتاح اللي فشل بيتعطّل مؤقتًا ويرجع بعد وقت
+   - التحقق من تسجيل الدخول (Supabase)
    ============================================================ */
 
 require('dotenv').config();
@@ -38,7 +39,7 @@ const API_KEYS = loadApiKeys();
 const MODEL_NAME = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 
 if (API_KEYS.length === 0) {
-  console.error('❌ خطأ: مفيش أي مفتاح Gemini في ملف .env');
+  console.error('❌ خطأ: مفيش أي مفتاح Gemini');
   process.exit(1);
 }
 
@@ -46,40 +47,118 @@ console.log(`🔑 عدد المفاتيح: ${API_KEYS.length}`);
 console.log(`🤖 الموديل: ${MODEL_NAME}`);
 
 /* ============================================================
-   🔄 مدير المفاتيح
+   🔐 التحقق من تسجيل الدخول (Supabase)
+   ============================================================ */
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://wgostqkywpybmzgbyzeo.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_zx0zeWR2bpbmyO90oN-4ow_FxZCSPl8';
+
+async function verifyUser(req) {
+  const authHeader = req.headers.authorization || '';
+  const token = authHeader.replace('Bearer ', '').trim();
+  if (!token) return null;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    return null;
+  }
+}
+
+/* ============================================================
+   🔄 مدير المفاتيح الذكي
    ============================================================ */
 class KeyManager {
   constructor(keys) {
     this.keys = keys;
     this.currentIndex = 0;
-    this.status = keys.map(() => ({ valid: true, failCount: 0, lastFail: null }));
+    /* كل مفتاح له: valid (شغال)، failCount، lastFailTime، cooldownUntil */
+    this.status = keys.map(() => ({
+      valid: true,
+      failCount: 0,
+      lastFail: null,
+      cooldownUntil: null,
+    }));
   }
-  current() { return this.keys[this.currentIndex]; }
+
+  /* المفتاح الحالي (لو في cooldown، ينتقل للتالي) */
+  current() {
+    /* لو المفتاح الحالي في cooldown، ينتقل للتالي */
+    if (this.status[this.currentIndex].cooldownUntil &&
+        Date.now() < this.status[this.currentIndex].cooldownUntil) {
+      this.next();
+    }
+    return this.keys[this.currentIndex];
+  }
+
+  /* انتقل للمفتاح التالي الصالح */
   next() {
     let tries = 0;
     do {
       this.currentIndex = (this.currentIndex + 1) % this.keys.length;
       tries++;
       if (tries > this.keys.length) return null;
-    } while (!this.status[this.currentIndex].valid);
+    } while (!this.isAvailable(this.currentIndex));
     return this.current();
   }
+
+  /* هل المفتاح متاح؟ */
+  isAvailable(index) {
+    const s = this.status[index];
+    if (!s.valid) return false;
+    if (s.cooldownUntil && Date.now() < s.cooldownUntil) return false;
+    return true;
+  }
+
+  /* علّم المفتاح الحالي إنه فشل */
   markFailed(reason) {
     const s = this.status[this.currentIndex];
     s.failCount++;
     s.lastFail = reason;
-    if (s.failCount >= 3) {
+
+    /* لو فشل بسبب rate limit، عطّله 60 ثانية */
+    if (reason.includes('429') || reason.includes('quota') || reason.includes('rate')) {
+      s.cooldownUntil = Date.now() + 60 * 1000; /* دقيقة */
+      console.log(`⏸️  المفتاح #${this.currentIndex + 1} في cooldown لمدة دقيقة`);
+    }
+    /* لو فشل بسبب مفتاح غلط، عطّله نهائي */
+    else if (reason.includes('API key') || reason.includes('403') || reason.includes('PERMISSION')) {
       s.valid = false;
-      console.log(`⚠️  المفتاح #${this.currentIndex + 1} معطّل (${reason})`);
+      console.log(`❌ المفتاح #${this.currentIndex + 1} معطّل نهائي (${reason.substring(0, 60)})`);
+    }
+    /* لو فشل 5 مرات، عطّله 5 دقايق */
+    else if (s.failCount >= 5) {
+      s.cooldownUntil = Date.now() + 5 * 60 * 1000;
+      console.log(`⏸️  المفتاح #${this.currentIndex + 1} في cooldown 5 دقايق`);
     }
   }
+
+  /* علّم المفتاح الحالي إنه نجح */
   markSuccess() {
-    this.status[this.currentIndex].failCount = 0;
+    const s = this.status[this.currentIndex];
+    s.failCount = 0;
+    s.cooldownUntil = null;
   }
-  allFailed() { return this.status.every(s => !s.valid); }
+
+  /* كل المفاتيح مشغولة؟ */
+  allBusy() {
+    return this.status.every((s, i) => !this.isAvailable(i));
+  }
+
+  /* حالة المفاتيح (للتشخيص) */
   getStatus() {
     return this.status.map((s, i) => ({
-      index: i + 1, valid: s.valid, failCount: s.failCount, lastFail: s.lastFail,
+      index: i + 1,
+      valid: s.valid,
+      failCount: s.failCount,
+      lastFail: s.lastFail,
+      cooldown: s.cooldownUntil ? Math.max(0, Math.round((s.cooldownUntil - Date.now()) / 1000)) + 's' : null,
     }));
   }
 }
@@ -105,18 +184,18 @@ const SYSTEM_PROMPT = `أنت "مساعد بسّطنا الإنجليزي" — �
 - لو السؤال مش واضح، اسأل للتوضيح`;
 
 /* ============================================================
-   🤖 دالة إرسال الطلب لـ Gemini (fetch مباشر)
+   🤖 دالة إرسال الطلب لـ Gemini مع تدوير المفاتيح
    ============================================================ */
 async function askGemini(messages) {
-  if (keyManager.allFailed()) throw new Error('ALL_KEYS_FAILED');
+  if (keyManager.allBusy()) {
+    throw new Error('ALL_KEYS_BUSY');
+  }
 
-  /* تحويل الرسائل لصيغة Gemini */
   const contents = messages.map(m => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: String(m.content || '') }]
   }));
 
-  /* إضافة System Prompt في البداية */
   contents.unshift({
     role: 'user',
     parts: [{ text: SYSTEM_PROMPT }]
@@ -128,9 +207,13 @@ async function askGemini(messages) {
 
   let lastError = null;
   let attempts = 0;
-  const maxAttempts = API_KEYS.length;
+  const maxAttempts = API_KEYS.length * 2; /* نحاول مرتين لكل مفتاح */
 
   while (attempts < maxAttempts) {
+    if (keyManager.allBusy()) {
+      throw new Error('ALL_KEYS_BUSY');
+    }
+
     const apiKey = keyManager.current();
     const keyNum = keyManager.currentIndex + 1;
 
@@ -169,8 +252,9 @@ async function askGemini(messages) {
     } catch (err) {
       lastError = err;
       const msg = err.message || '';
-      console.log(`❌ فشل المفتاح #${keyNum}: ${msg.substring(0, 120)}`);
+      console.log(`❌ فشل المفتاح #${keyNum}: ${msg.substring(0, 100)}`);
 
+      /* لو خطأ في المفتاح أو الحد المسموح، علّمه وجرب التالي */
       if (
         msg.includes('API_KEY') ||
         msg.includes('API key') ||
@@ -179,40 +263,53 @@ async function askGemini(messages) {
         msg.includes('quota') ||
         msg.includes('rate') ||
         msg.includes('RESOURCE_EXHAUSTED') ||
-        msg.includes('PERMISSION_DENIED')
+        msg.includes('PERMISSION_DENIED') ||
+        msg.includes('EMPTY_RESPONSE')
       ) {
-        keyManager.markFailed(msg.substring(0, 80));
+        keyManager.markFailed(msg);
         const nextKey = keyManager.next();
         if (!nextKey) break;
         attempts++;
         continue;
       }
 
+      /* لو خطأ في الموديل أو الطلب نفسه، متجربش مفاتيح تانية */
       throw err;
     }
   }
 
-  throw lastError || new Error('ALL_KEYS_FAILED');
+  throw lastError || new Error('ALL_KEYS_BUSY');
 }
 
 /* ============================================================
-   🛣️ مسار /api/ai
+   🛣️ مسار /api/ai (للمسجلين بس)
    ============================================================ */
 app.post('/api/ai', async (req, res) => {
   try {
+    /* 🔐 التحقق من تسجيل الدخول */
+    const user = await verifyUser(req);
+    if (!user) {
+      return res.status(401).json({
+        code: 'LOGIN_REQUIRED',
+        error: 'سجّل دخولك الأول عشان تستخدم المساعد الذكي'
+      });
+    }
+
     const { messages } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({ code: 'BAD_REQUEST', error: 'لازم تبعت messages (array)' });
     }
+
     const reply = await askGemini(messages);
     res.json({ reply });
+
   } catch (err) {
     console.error('❌ [AI Error]', err.message);
 
-    if (err.message === 'ALL_KEYS_FAILED') {
+    if (err.message === 'ALL_KEYS_BUSY') {
       return res.status(503).json({
-        code: 'ALL_KEYS_FAILED',
-        error: 'كل المفاتيح خلصت أو معطلة. ضيف مفتاح جديد في .env'
+        code: 'ALL_KEYS_BUSY',
+        error: 'كل المفاتيح مشغولة دلوقتي، جرب تاني بعد دقيقة'
       });
     }
     if (err.message?.includes('API key') || err.message?.includes('403')) {
@@ -226,7 +323,7 @@ app.post('/api/ai', async (req, res) => {
 });
 
 /* ============================================================
-   🏥 فحص الحالة
+   🏥 فحص الحالة (للتشخيص)
    ============================================================ */
 app.get('/api/health', (req, res) => {
   res.json({

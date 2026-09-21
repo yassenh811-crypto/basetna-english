@@ -1,12 +1,9 @@
 /* ============================================================
-   🤖 ai.js — واجهة المساعد الذكي (الشات)
+   🤖 ai.js — واجهة المساعد الذكي (للمسجلين دخول بس)
    ------------------------------------------------------------
-   الملف ده مفيهوش أي مفتاح.
-   هو بيبعت السؤال للسيرفر (server.js)
-   والسيرفر هو اللي بيقرأ المفاتيح من ملف .env ويكلّم Gemini.
-
-   يتحمّل في index.html قبل app.js:
-       <script src="ai.js"></script>
+   - المساعد بيظهر بس بعد تسجيل الدخول
+   - بيبعت التوكن للسيرفر للتحقق
+   - مفيش أي مفاتيح API في الملف ده
    ============================================================ */
 (function () {
   "use strict";
@@ -15,10 +12,9 @@
      ⚙️ الإعدادات
      ============================================================ */
 
-  /* فاضي = السيرفر هو نفسه اللي بيقدّم الموقع (الوضع العادي).
-     لو الموقع على GitHub Pages والسيرفر على استضافة تانية，
-     اكتب رابط السيرفر هنا، مثال: "https://basetna-ai.onrender.com" */
- const API_URL = "https://basetna-english.vercel.app";
+  /* رابط السيرفر على Vercel */
+  const API_URL = "https://basetna-english.vercel.app";
+
   const UI = {
     assistantName: "مساعد بسّطنا 🤖",
     greeting: "أهلاً! 👋 أنا مساعد «بسّطنا الإنجليزي».\nاسألني في أي حاجة في الإنجليزي: قواعد، ترجمة، تمارين، أو حتى مساعدة في استخدام الموقع.",
@@ -42,6 +38,7 @@
     constructor(code, message) { super(message); this.code = code; }
   }
 
+  /* بنجيب التوكن من Supabase */
   async function authToken() {
     try {
       if (typeof supabaseClient !== "undefined" && supabaseClient && supabaseClient.auth) {
@@ -52,11 +49,23 @@
     return "";
   }
 
+  /* هل المستخدم مسجل دخول؟ */
+  async function isLoggedIn() {
+    const token = await authToken();
+    return !!token;
+  }
+
   async function ask(history, text) {
     const messages = history.slice(-UI.historyLimit).concat([{ role: "user", content: text }]);
     const headers = { "Content-Type": "application/json" };
     const token = await authToken();
-    if (token) headers.Authorization = "Bearer " + token;
+
+    /* لو مفيش توكن، ارفض */
+    if (!token) {
+      throw new AIError("LOGIN_REQUIRED", "سجّل دخولك الأول عشان تستخدم المساعد الذكي");
+    }
+
+    headers.Authorization = "Bearer " + token;
 
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), UI.timeoutMs);
@@ -71,7 +80,7 @@
     } catch (e) {
       throw new AIError("NETWORK", e.name === "AbortError"
         ? "الرد اتأخر أوي، جرّب تاني."
-        : "مش قادر أوصل للسيرفر. اتأكد إنه شغّال (npm start).");
+        : "مش قادر أوصل للسيرفر. اتأكد إنه شغّال.");
     } finally {
       clearTimeout(timer);
     }
@@ -80,8 +89,11 @@
     try { data = await res.json(); } catch (e) { /* مش JSON */ }
 
     if (!res.ok) {
+      if (res.status === 401 || (data && data.code === 'LOGIN_REQUIRED')) {
+        throw new AIError("LOGIN_REQUIRED", "سجّل دخولك الأول عشان تستخدم المساعد الذكي");
+      }
       if (!data || !data.code) {
-        throw new AIError("NO_SERVER", "سيرفر المساعد مش شغّال. شغّل npm start، أو لو الموقع على استضافة ملفات بس اكتب رابط السيرفر في API_URL جوه ai.js.");
+        throw new AIError("NO_SERVER", "سيرفر المساعد مش شغّال.");
       }
       throw new AIError(data.code, data.error || "حصلت مشكلة (" + res.status + ")");
     }
@@ -363,9 +375,40 @@
 
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePanel(); });
 
-  function boot() { buildUI(); }
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
-  else boot();
+  /* ============================================================
+     4) التشغيل — يشتغل بس لو المستخدم مسجل دخول
+     ============================================================ */
+  async function boot() {
+    /* نتحقق إن المستخدم مسجل دخول */
+    const loggedIn = await isLoggedIn();
+    if (loggedIn) {
+      buildUI();
+      console.log('✅ المساعد الذكي: تم التحميل');
+    } else {
+      console.log('⏸️ المساعد الذكي: متوقف لحد ما تسجل دخول');
+      /* نستنى تغيير حالة الدخول */
+      if (typeof supabaseClient !== "undefined" && supabaseClient && supabaseClient.auth) {
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+          if (session && session.access_token) {
+            console.log('✅ تم تسجيل الدخول — تشغيل المساعد');
+            buildUI();
+          } else {
+            console.log('🚪 تم تسجيل الخروج — إيقاف المساعد');
+            const fab = el("bai-fab");
+            const overlay = el("bai-overlay");
+            if (fab) fab.remove();
+            if (overlay) overlay.remove();
+          }
+        });
+      }
+    }
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
 
   window.AI = {
     ask: (t) => ask([], String(t || "")),

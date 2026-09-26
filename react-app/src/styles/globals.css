@@ -1,0 +1,79 @@
+/* ============================================================
+   بسّطنا الإنجليزي — globals.css
+   ============================================================ */
+:root{
+  --navy:#122A4D;--navy-deep:#0B1D38;--navy-mid:#1B3B66;
+  --gold:#C79A3D;--gold-soft:#E8CE94;
+  --teal:#2E7D6B;--teal-dark:#235F52;
+  --paper:#FAF6EE;--paper-2:#F1EADC;
+  --ink:#1B1B1B;--ink-soft:#5B5B5B;
+  --line:#E6DEC9;--danger:#B3432C;
+  --purple:#7B1FA2;--purple-dark:#4A148C;
+  --pink:#E91E63;--pink-dark:#AD1457;
+  --blue:#1976D2;--blue-dark:#0D47A1;
+  --radius-s:8px;--radius-m:14px;--radius-l:20px;
+  --shadow-sm:0 4px 14px rgba(11,29,56,.08);
+  --shadow:0 10px 30px rgba(11,29,56,.10);
+  --shadow-lg:0 22px 50px rgba(11,29,56,.18);
+  --font:'Cairo','Segoe UI',sans-serif;
+  --ai:#6C5CE7; --ai-dark:#3B2FA8;
+  --ease:cubic-bezier(.22,1,.36,1);
+  --ring:0 0 0 4px rgba(199,154,61,.18);
+}
+
+*,*::before,*::after{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:var(--font);
+  background:var(--paper);
+  color:var(--ink);
+  line-height:1.65;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+html[dir="rtl"] body{direction:rtl;}
+html[dir="ltr"] body{direction:ltr;}
+a{color:inherit;text-decoration:none;}
+img{max-width:100%;display:block;}
+button{font-family:var(--font);cursor:pointer;}
+input,select,textarea{font-family:var(--font);}
+::selection{background:var(--gold-soft);color:var(--navy-deep);}
+.container{max-width:1180px;margin:0 auto;padding:0 clamp(16px,4vw,24px);}
+
+/* تنعيم عام */
+*{ -webkit-tap-highlight-color: transparent; }
+@media (prefers-reduced-motion: no-preference){
+  .card, .btn, .kpi, .level-card, .pkg-card, .nav-link, .lesson-item{
+    transition: transform .28s var(--ease), box-shadow .28s var(--ease),
+                border-color .2s ease, background .2s ease;
+  }
+}
+
+/* سكرول بار */
+*::-webkit-scrollbar{width:10px;height:10px;}
+*::-webkit-scrollbar-track{background:transparent;}
+*::-webkit-scrollbar-thumb{
+  background:linear-gradient(180deg,var(--gold),#B7863A);
+  border-radius:999px;border:2px solid var(--paper);
+}
+*::-webkit-scrollbar-thumb:hover{background:var(--navy-mid);}
+
+/* زرار أساسي */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:11px 24px;border-radius:999px;border:none;font-weight:700;font-size:15px;transition:transform .18s ease, box-shadow .18s ease;white-space:nowrap;position:relative;overflow:hidden;}
+.btn:active{transform:translateY(1px) scale(.98);}
+.btn:hover{transform:translateY(-2px);}
+.btn-gold{background:linear-gradient(135deg,var(--gold),#B7863A);color:#fff;box-shadow:0 6px 16px rgba(199,154,61,.35);}
+.btn-outline{background:transparent;border:1.5px solid #fff;color:#fff;}
+.btn-outline:hover{background:rgba(255,255,255,.12);}
+.btn-teal{background:linear-gradient(135deg,var(--teal),var(--teal-dark));color:#fff;box-shadow:0 6px 16px rgba(46,125,107,.3);}
+.btn-ghost{background:var(--paper-2);color:var(--ink);}
+.btn-ghost:hover{background:var(--line);}
+.btn-block{width:100%;}
+.btn-sm{padding:8px 16px;font-size:13.5px;}
+.btn::after{
+  content:"";position:absolute;inset:0;background:rgba(255,255,255,.22);
+  transform:translateX(-120%) skewX(-18deg);transition:transform .55s var(--ease);
+}
+.btn:hover::after{ transform:translateX(120%) skewX(-18deg); }
+.btn:focus-visible{ outline:none; box-shadow:var(--ring); }

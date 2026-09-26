@@ -1,0 +1,7 @@
+/* ============================================================
+   بسّطنا الإنجليزي — print.css
+   ============================================================ */
+@media print{
+  .sidebar,.support-fabs,.wa-float,.ai-fab,.topbar,.btn{ display:none !important; }
+  .dash-main{ padding:0 !important; }
+}

@@ -1,0 +1,60 @@
+/* ============================================================
+   🎨 UIContext — إدارة حالة الواجهة
+   ============================================================ */
+import { createContext, useContext, useEffect, useState } from 'react';
+
+const UIContext = createContext(null);
+
+export function UIProvider({ children }) {
+  const [lang, setLang] = useState(() => localStorage.getItem('basetna_lang') || 'ar');
+  const [gender, setGender] = useState(() => localStorage.getItem('basetna_gender') || null);
+  const [showWelcome, setShowWelcome] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
+  const [supportType, setSupportType] = useState('support');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('basetna_gender');
+    if (!stored) setShowWelcome(true);
+    else setGender(stored);
+  }, []);
+
+  function toggleLanguage() {
+    const newLang = lang === 'ar' ? 'en' : 'ar';
+    setLang(newLang);
+    localStorage.setItem('basetna_lang', newLang);
+    document.documentElement.lang = newLang;
+    document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+  }
+
+  function pickGender(g) {
+    setGender(g);
+    localStorage.setItem('basetna_gender', g);
+    document.cookie = `basetna_gender=${g}; max-age=31536000; path=/; SameSite=Lax`;
+    setShowWelcome(false);
+  }
+
+  function openWelcomeAgain() {
+    setShowWelcome(true);
+  }
+
+  function openSupport(type) {
+    setSupportType(type);
+    setShowSupport(true);
+  }
+
+  const value = {
+    lang, toggleLanguage,
+    gender, pickGender, openWelcomeAgain,
+    showWelcome, setShowWelcome,
+    showSupport, setShowSupport,
+    supportType, openSupport,
+  };
+
+  return <UIContext.Provider value={value}>{children}</UIContext.Provider>;
+}
+
+export function useUI() {
+  const ctx = useContext(UIContext);
+  if (!ctx) throw new Error('useUI must be used inside UIProvider');
+  return ctx;
+}

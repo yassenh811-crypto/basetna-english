@@ -1,10 +1,14 @@
 /* ============================================================
-   🎬 CoursePlayer — مشغل الكورس مع تتبع التقدم
+   🎬 CoursePlayer — مشغل الكورس (الفيديو التقديمي + الدروس + التعليقات)
    ============================================================ */
 import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
+import Comments from './Comments';
 
+/* ============================================================
+   استخراج ID من روابط الفيديو
+   ============================================================ */
 function extractYouTubeId(url) {
   if (!url) return null;
   const patterns = [
@@ -19,6 +23,7 @@ function extractYouTubeId(url) {
 }
 
 function getVideoThumbnail(type, url) {
+  if (!url) return null;
   if (type === 'youtube') {
     const id = extractYouTubeId(url);
     return id ? `https://img.youtube.com/vi/${id}/hqdefault.jpg` : null;
@@ -30,6 +35,9 @@ function getVideoThumbnail(type, url) {
   return null;
 }
 
+/* ============================================================
+   CoursePlayer
+   ============================================================ */
 function CoursePlayer({ course, onClose }) {
   const { profile } = useAuth();
   const [lessons, setLessons] = useState([]);
@@ -41,9 +49,13 @@ function CoursePlayer({ course, onClose }) {
   const [watchedIds, setWatchedIds] = useState(new Set());
   const [progress, setProgress] = useState({ watched: 0, total: 0, pct: 0 });
 
+  /* ============================================================
+     جلب الدروس + التقييمات + التقدم
+     ============================================================ */
   useEffect(() => {
     async function load() {
       setLoading(true);
+
       const [lessonsRes, ratingsRes, myRatingRes] = await Promise.all([
         supabase.from('lessons').select('*').eq('course_id', course.id).order('sort_order'),
         supabase.from('course_ratings').select('rating').eq('course_id', course.id),
@@ -53,8 +65,25 @@ function CoursePlayer({ course, onClose }) {
       ]);
 
       const lessonsData = lessonsRes.data || [];
-      setLessons(lessonsData);
-      if (lessonsData.length > 0) setActiveLesson(lessonsData[0]);
+
+      /* ✅ ضيف الفيديو التقديمي في الأول */
+      const introLesson = {
+        id: '__intro__',
+        title_ar: '🎬 الفيديو التقديمي',
+        description_ar: course.description_ar || '',
+        video_type: course.content_type || 'youtube',
+        video_url: course.content_url || '',
+        duration_min: 0,
+        sort_order: -1,
+        is_intro: true,
+      };
+
+      const allLessons = course.content_url
+        ? [introLesson, ...lessonsData]
+        : lessonsData;
+
+      setLessons(allLessons);
+      if (allLessons.length > 0) setActiveLesson(allLessons[0]);
 
       const ratings = ratingsRes.data || [];
       const total = ratings.reduce((a, r) => a + r.rating, 0);
@@ -68,7 +97,7 @@ function CoursePlayer({ course, onClose }) {
         setRating(myRatingRes.data.rating);
       }
 
-      /* جلب تقدم الطالب */
+      /* جلب تقدم الطالب (بس للدروس الحقيقية) */
       if (profile && lessonsData.length > 0) {
         const { data: progressData } = await supabase
           .from('lesson_progress')
@@ -85,34 +114,47 @@ function CoursePlayer({ course, onClose }) {
         setProgress({
           watched: w,
           total: lessonsData.length,
-          pct: Math.round((w / lessonsData.length) * 100),
+          pct: lessonsData.length > 0 ? Math.round((w / lessonsData.length) * 100) : 0,
         });
       }
 
       setLoading(false);
     }
     load();
-  }, [course.id, profile]);
+  }, [course.id, profile, course.content_url, course.content_type, course.description_ar]);
 
+  /* ============================================================
+     تشغيل درس
+     ============================================================ */
   async function playLesson(lesson) {
     setActiveLesson(lesson);
+
+    /* الفيديو التقديمي مش بيتحسب في التقدم */
+    if (lesson.is_intro) return;
+
     if (profile) {
       await supabase.from('lesson_progress').upsert(
         { lesson_id: lesson.id, student_id: profile.id, watched: true },
         { onConflict: 'lesson_id,student_id' }
       );
+
       const newSet = new Set(watchedIds);
       newSet.add(lesson.id);
       setWatchedIds(newSet);
-      const w = lessons.filter((l) => newSet.has(l.id)).length;
+
+      const realLessons = lessons.filter((l) => !l.is_intro);
+      const w = realLessons.filter((l) => newSet.has(l.id)).length;
       setProgress({
         watched: w,
-        total: lessons.length,
-        pct: Math.round((w / lessons.length) * 100),
+        total: realLessons.length,
+        pct: realLessons.length > 0 ? Math.round((w / realLessons.length) * 100) : 0,
       });
     }
   }
 
+  /* ============================================================
+     إرسال تقييم
+     ============================================================ */
   async function submitRating(value) {
     if (!profile) return;
     setRating(value);
@@ -124,6 +166,9 @@ function CoursePlayer({ course, onClose }) {
     setMyRating(value);
   }
 
+  /* ============================================================
+     عرض الفيديو — يدعم كل الأنواع
+     ============================================================ */
   function renderVideo() {
     if (!activeLesson) {
       return (
@@ -136,32 +181,110 @@ function CoursePlayer({ course, onClose }) {
 
     const { video_type, video_url } = activeLesson;
 
+    /* YouTube */
     if (video_type === 'youtube') {
       const id = extractYouTubeId(video_url);
       return id ? (
-        <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${id}?autoplay=1&rel=0`} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen></iframe>
-      ) : null;
+        <iframe
+          width="100%"
+          height="100%"
+          src={`https://www.youtube.com/embed/${id}?autoplay=1&rel=0`}
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+        ></iframe>
+      ) : (
+        <div style={{ padding: 20, color: '#fff', textAlign: 'center' }}>
+          <p>⚠️ رابط YouTube غلط</p>
+          <a href={video_url} target="_blank" rel="noopener" style={{ color: 'var(--gold-soft)' }}>
+            افتح الرابط خارج الموقع
+          </a>
+        </div>
+      );
     }
+
+    /* Vimeo */
     if (video_type === 'vimeo') {
       const m = video_url.match(/vimeo\.com\/(\d+)/);
-      return m ? <iframe src={`https://player.vimeo.com/video/${m[1]}?autoplay=1`} width="100%" height="100%" frameBorder="0" allow="autoplay; fullscreen"></iframe> : null;
+      return m ? (
+        <iframe
+          src={`https://player.vimeo.com/video/${m[1]}?autoplay=1`}
+          width="100%"
+          height="100%"
+          frameBorder="0"
+          allow="autoplay; fullscreen"
+        ></iframe>
+      ) : (
+        <div style={{ padding: 20, color: '#fff', textAlign: 'center' }}>
+          <p>⚠️ رابط Vimeo غلط</p>
+        </div>
+      );
     }
+
+    /* Google Drive */
     if (video_type === 'drive') {
       const m = video_url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([A-Za-z0-9_-]+)/);
-      return m ? <iframe src={`https://drive.google.com/file/d/${m[1]}/preview`} width="100%" height="100%" frameBorder="0" allow="autoplay"></iframe> : null;
+      return m ? (
+        <iframe
+          src={`https://drive.google.com/file/d/${m[1]}/preview`}
+          width="100%"
+          height="100%"
+          frameBorder="0"
+          allow="autoplay"
+        ></iframe>
+      ) : (
+        <div style={{ padding: 20, color: '#fff', textAlign: 'center' }}>
+          <p>⚠️ رابط Google Drive غلط</p>
+          <a href={video_url} target="_blank" rel="noopener" style={{ color: 'var(--gold-soft)' }}>
+            افتح الرابط خارج الموقع
+          </a>
+        </div>
+      );
     }
-    return <video src={video_url} controls autoPlay style={{ width: '100%', height: '100%' }}></video>;
+
+    /* رابط مباشر */
+    if (video_type === 'link' || video_type === 'file') {
+      if (/\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(video_url)) {
+        return (
+          <video src={video_url} controls autoPlay style={{ width: '100%', height: '100%' }}></video>
+        );
+      }
+      return (
+        <iframe
+          src={video_url}
+          width="100%"
+          height="100%"
+          frameBorder="0"
+          allow="autoplay; fullscreen"
+        ></iframe>
+      );
+    }
+
+    /* Fallback */
+    return (
+      <div style={{ padding: 20, color: '#fff', textAlign: 'center' }}>
+        <p>⚠️ نوع الفيديو مش مدعوم</p>
+        <a href={video_url} target="_blank" rel="noopener" style={{ color: 'var(--gold-soft)' }}>
+          افتح الرابط خارج الموقع
+        </a>
+      </div>
+    );
   }
 
+  /* ============================================================
+     Render
+     ============================================================ */
   return (
     <div className="overlay open" onClick={onClose}>
       <div className="course-player-modal" onClick={(e) => e.stopPropagation()}>
         <button className="close" onClick={onClose}>✕</button>
 
+        {/* الفيديو */}
         <div className="video-wrapper">
           <div id="video-player">{renderVideo()}</div>
         </div>
 
+        {/* تفاصيل الفيديو */}
         {activeLesson && (
           <div className="video-details">
             <h3>{activeLesson.title_ar}</h3>
@@ -169,11 +292,12 @@ function CoursePlayer({ course, onClose }) {
           </div>
         )}
 
+        {/* رأس الكورس */}
         <div className="course-player-head">
           <h2>{course.title_ar}</h2>
           <div className="player-meta">
             <span>⭐ {ratingStats.avg} ({ratingStats.count} تقييم)</span>
-            <span>📹 {lessons.length} فيديو</span>
+            <span>📹 {lessons.filter((l) => !l.is_intro).length} فيديو</span>
           </div>
         </div>
 
@@ -190,6 +314,7 @@ function CoursePlayer({ course, onClose }) {
           </div>
         )}
 
+        {/* قايمة الدروس */}
         {loading ? (
           <div className="empty-state">جاري التحميل...</div>
         ) : lessons.length === 0 ? (
@@ -198,22 +323,30 @@ function CoursePlayer({ course, onClose }) {
           <div className="lessons-list">
             {lessons.map((lesson, i) => {
               const isWatched = watchedIds.has(lesson.id);
+              const isActive = activeLesson?.id === lesson.id;
               return (
                 <div
                   key={lesson.id}
                   className="lesson-item"
                   onClick={() => playLesson(lesson)}
-                  style={activeLesson?.id === lesson.id ? { borderColor: 'var(--teal)', background: '#F5FAF8' } : {}}
+                  style={isActive ? { borderColor: 'var(--teal)', background: '#F5FAF8' } : {}}
                 >
                   <div className="lesson-thumb">
                     {getVideoThumbnail(lesson.video_type, lesson.video_url) ? (
                       <img src={getVideoThumbnail(lesson.video_type, lesson.video_url)} alt={lesson.title_ar} />
                     ) : (
-                      <div className="lesson-placeholder">🎬</div>
+                      <div className="lesson-placeholder">{lesson.is_intro ? '🎬' : '🎥'}</div>
                     )}
-                    <div className="lesson-play"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg></div>
-                    <span className="lesson-num">{i + 1}</span>
-                    {isWatched && (
+                    <div className="lesson-play">
+                      <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                    </div>
+                    <span
+                      className="lesson-num"
+                      style={lesson.is_intro ? { background: 'var(--gold)', fontSize: 10, width: 'auto', padding: '2px 8px', borderRadius: 999 } : {}}
+                    >
+                      {lesson.is_intro ? 'مقدمة' : i}
+                    </span>
+                    {isWatched && !lesson.is_intro && (
                       <span style={{ position: 'absolute', top: 6, right: 6, background: 'var(--teal)', color: '#fff', borderRadius: '50%', width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>✓</span>
                     )}
                   </div>
@@ -230,6 +363,7 @@ function CoursePlayer({ course, onClose }) {
           </div>
         )}
 
+        {/* التقييم */}
         <div className="course-rating-section">
           <h3>⭐ قيّم الكورس</h3>
           <div className="rating-stars">
@@ -239,6 +373,11 @@ function CoursePlayer({ course, onClose }) {
           </div>
           {myRating && <p className="rating-thanks">شكراً لتقييمك 💛</p>}
         </div>
+
+        {/* ✅ التعليقات — للمسجلين دخول بس */}
+        {profile && activeLesson && !activeLesson.is_intro && (
+          <Comments lessonId={activeLesson.id} />
+        )}
       </div>
     </div>
   );

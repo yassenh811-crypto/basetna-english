@@ -13,6 +13,7 @@ function AdminPackages() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [msg, setMsg] = useState('');
+  const [search, setSearch] = useState('');
 
   const [form, setForm] = useState({
     name_ar: '',
@@ -24,26 +25,24 @@ function AdminPackages() {
     is_active: true,
   });
 
-  /* ============================================================
-     جلب البيانات
-     ============================================================ */
   async function loadData() {
     setLoading(true);
     const [pkgRes, lvRes] = await Promise.all([
-      supabase.from('packages').select('*').order('created_at', { ascending: false }),
+      supabase
+        .from('packages')
+        .select('*')
+        .order('created_at', { ascending: false }),
       supabase.from('grade_levels').select('*').order('sort_order'),
     ]);
-    if (pkgRes.error) console.error(pkgRes.error);
     setPackages(pkgRes.data || []);
     setLevels(lvRes.data || []);
     setLoading(false);
   }
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  /* ============================================================
-     Modal
-     ============================================================ */
   function openAddModal() {
     setEditing(null);
     setForm({
@@ -74,9 +73,6 @@ function AdminPackages() {
     setModalOpen(true);
   }
 
-  /* ============================================================
-     حفظ
-     ============================================================ */
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
@@ -100,7 +96,10 @@ function AdminPackages() {
 
     let error;
     if (editing) {
-      ({ error } = await supabase.from('packages').update(payload).eq('id', editing.id));
+      ({ error } = await supabase
+        .from('packages')
+        .update(payload)
+        .eq('id', editing.id));
     } else {
       ({ error } = await supabase.from('packages').insert(payload));
     }
@@ -119,24 +118,46 @@ function AdminPackages() {
   async function handleDelete(id) {
     if (!confirm('متأكد إنك عايز تحذف الباقة دي؟')) return;
     const { error } = await supabase.from('packages').delete().eq('id', id);
-    if (error) { alert('❌ ' + error.message); return; }
+    if (error) {
+      alert('❌ ' + error.message);
+      return;
+    }
     await loadData();
   }
 
-  /* ============================================================
-     جلب اسم المرحلة
-     ============================================================ */
   function levelName(id) {
     return levels.find((l) => l.id === id)?.name_ar || '—';
   }
 
+  const filteredPackages = packages.filter(
+    (p) =>
+      (p.name_ar || '').toLowerCase().includes(search.toLowerCase()) ||
+      (p.name_en || '').toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <>
-      <div className="dash-head">
+      <div className="dash-head" style={{ flexWrap: 'wrap', gap: 10 }}>
         <h1>الباقات</h1>
-        <button className="btn btn-gold btn-sm" onClick={openAddModal}>
-          + إضافة باقة
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="🔍 ابحث في الباقات..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              padding: '10px 16px',
+              border: '1.5px solid var(--line)',
+              borderRadius: 999,
+              fontSize: 14,
+              minWidth: 220,
+              background: '#fff',
+            }}
+          />
+          <button className="btn btn-gold btn-sm" onClick={openAddModal}>
+            + إضافة باقة
+          </button>
+        </div>
       </div>
 
       <div className="table-wrap">
@@ -153,24 +174,48 @@ function AdminPackages() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="6"><div className="empty-state">جاري التحميل...</div></td></tr>
-            ) : packages.length === 0 ? (
-              <tr><td colSpan="6"><div className="empty-state">لسه مفيش باقات</div></td></tr>
+              <tr>
+                <td colSpan="6">
+                  <div className="empty-state">جاري التحميل...</div>
+                </td>
+              </tr>
+            ) : filteredPackages.length === 0 ? (
+              <tr>
+                <td colSpan="6">
+                  <div className="empty-state">
+                    {search ? 'مفيش نتايج' : 'لسه مفيش باقات'}
+                  </div>
+                </td>
+              </tr>
             ) : (
-              packages.map((p) => (
+              filteredPackages.map((p) => (
                 <tr key={p.id}>
-                  <td><b>{p.name_ar}</b></td>
+                  <td>
+                    <b>{p.name_ar}</b>
+                  </td>
                   <td>{levelName(p.grade_level_id)}</td>
                   <td>{p.price} ج.م</td>
                   <td>{p.duration_days} يوم</td>
                   <td>
-                    <span className={`badge ${p.is_active ? 'active' : 'expired'}`}>
+                    <span
+                      className={`badge ${p.is_active ? 'active' : 'expired'}`}
+                    >
                       {p.is_active ? 'فعّالة' : 'موقوفة'}
                     </span>
                   </td>
                   <td>
-                    <button className="icon-btn" onClick={() => openEditModal(p)}>✏️</button>
-                    <button className="icon-btn danger" onClick={() => handleDelete(p.id)}>🗑️</button>
+                    <button
+                      className="icon-btn"
+                      onClick={() => openEditModal(p)}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className="icon-btn danger"
+                      onClick={() => handleDelete(p.id)}
+                    >
+                      🗑️
+                    </button>
                   </td>
                 </tr>
               ))
@@ -208,12 +253,16 @@ function AdminPackages() {
           <label>المرحلة</label>
           <select
             value={form.grade_level_id}
-            onChange={(e) => setForm({ ...form, grade_level_id: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, grade_level_id: e.target.value })
+            }
             required
           >
             <option value="">— اختار مرحلة —</option>
             {levels.map((lv) => (
-              <option key={lv.id} value={lv.id}>{lv.name_ar}</option>
+              <option key={lv.id} value={lv.id}>
+                {lv.name_ar}
+              </option>
             ))}
           </select>
         </div>
@@ -231,7 +280,9 @@ function AdminPackages() {
           <input
             type="number"
             value={form.duration_days}
-            onChange={(e) => setForm({ ...form, duration_days: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, duration_days: e.target.value })
+            }
             min="1"
           />
         </div>
@@ -240,7 +291,9 @@ function AdminPackages() {
           <textarea
             rows="3"
             value={form.description_ar}
-            onChange={(e) => setForm({ ...form, description_ar: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, description_ar: e.target.value })
+            }
           />
         </div>
         <div className="field">
@@ -248,7 +301,9 @@ function AdminPackages() {
             <input
               type="checkbox"
               checked={form.is_active}
-              onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+              onChange={(e) =>
+                setForm({ ...form, is_active: e.target.checked })
+              }
               style={{ marginInlineEnd: 8 }}
             />
             فعّالة

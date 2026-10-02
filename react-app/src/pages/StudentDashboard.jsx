@@ -14,15 +14,11 @@ function StudentDashboard() {
   const [search, setSearch] = useState('');
   const [playerCourse, setPlayerCourse] = useState(null);
 
-  /* ============================================================
-     جلب البيانات
-     ============================================================ */
   useEffect(() => {
     async function load() {
       if (!profile) return;
       setLoading(true);
 
-      /* 1. جلب آخر اشتراك */
       const { data: subs } = await supabase
         .from('subscriptions')
         .select('*')
@@ -33,7 +29,6 @@ function StudentDashboard() {
       const latestSub = subs?.[0] || null;
       setSubscription(latestSub);
 
-      /* 2. جلب كورسات المرحلة */
       if (profile.grade_level_id) {
         const { data: coursesData } = await supabase
           .from('courses')
@@ -48,16 +43,10 @@ function StudentDashboard() {
     load();
   }, [profile]);
 
-  /* ============================================================
-     فلترة الكورسات
-     ============================================================ */
   const filteredCourses = courses.filter((c) =>
     (c.title_ar || '').toLowerCase().includes(search.toLowerCase())
   );
 
-  /* ============================================================
-     حالة الاشتراك
-     ============================================================ */
   const isActive = (() => {
     if (!subscription) return false;
     if (subscription.status !== 'active') return false;
@@ -71,36 +60,28 @@ function StudentDashboard() {
     return Math.max(0, Math.ceil((endDate - new Date()) / (1000 * 60 * 60 * 24)));
   })();
 
-  /* ============================================================
-     أيام الأسبوع
-     ============================================================ */
-  const dayNames = ['الأحد', 'الإتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
-  const today = dayNames[new Date().getDay()];
-
   return (
     <div className="dash-shell">
-      {/* ============================================================
-          Sidebar
-          ============================================================ */}
       <aside className="sidebar">
-        <div className="brand"><span className="mark">EN</span> بسّطنا الإنجليزي</div>
-
-        <a href="#" className="active">كورساتي</a>
-
+        <div className="brand">
+          <span className="mark">EN</span> بسّطنا الإنجليزي
+        </div>
+        <a href="#" className="active">
+          كورساتي
+        </a>
         <a
           href="#"
-          onClick={(e) => { e.preventDefault(); signOut(); }}
+          onClick={(e) => {
+            e.preventDefault();
+            signOut();
+          }}
           className="logout"
         >
           تسجيل الخروج
         </a>
       </aside>
 
-      {/* ============================================================
-          Main
-          ============================================================ */}
       <main className="dash-main">
-        {/* Header */}
         <div className="dash-head">
           <h1>🎓 أهلاً بيك يا {profile?.full_name || ''}</h1>
           <span className={`badge ${isActive ? 'active' : 'expired'}`}>
@@ -108,11 +89,13 @@ function StudentDashboard() {
           </span>
         </div>
 
-        {/* رسالة لو مفيش اشتراك */}
         {!isActive && (
           <div
             className="card"
-            style={{ marginBottom: 24, borderTop: '4px solid var(--danger)' }}
+            style={{
+              marginBottom: 24,
+              borderTop: '4px solid var(--danger)',
+            }}
           >
             <p style={{ margin: '0 0 12px' }}>
               ⚠️ مفيش اشتراك فعّال. تواصل مع مس. شيرهان لتجديد الاشتراك.
@@ -120,17 +103,18 @@ function StudentDashboard() {
           </div>
         )}
 
-        {/* لو مفيش مرحلة */}
         {isActive && !profile?.grade_level_id && (
           <div className="empty-state">
             محتاج تحدد مرحلتك الدراسية. تواصل مع الدعم.
           </div>
         )}
 
-        {/* البحث */}
         {isActive && profile?.grade_level_id && (
           <>
-            <div className="search-box" style={{ marginBottom: 20, maxWidth: '100%' }}>
+            <div
+              className="search-box"
+              style={{ marginBottom: 20, maxWidth: '100%' }}
+            >
               <input
                 type="text"
                 placeholder="🔍 ابحث في كورساتك..."
@@ -139,7 +123,6 @@ function StudentDashboard() {
               />
             </div>
 
-            {/* شبكة الكورسات */}
             {loading ? (
               <div className="empty-state">جاري التحميل...</div>
             ) : filteredCourses.length === 0 ? (
@@ -177,9 +160,6 @@ function StudentDashboard() {
         )}
       </main>
 
-      {/* ============================================================
-          Course Player
-          ============================================================ */}
       {playerCourse && (
         <CoursePlayer
           course={playerCourse}

@@ -14,9 +14,6 @@ function SubscriptionForm({ student, onClose }) {
   const [levelId, setLevelId] = useState(student.grade_level_id || '');
   const [packageId, setPackageId] = useState('');
 
-  /* ============================================================
-     جلب المراحل
-     ============================================================ */
   useEffect(() => {
     async function loadLevels() {
       setLoading(true);
@@ -30,9 +27,6 @@ function SubscriptionForm({ student, onClose }) {
     loadLevels();
   }, []);
 
-  /* ============================================================
-     جلب الباقات حسب المرحلة
-     ============================================================ */
   useEffect(() => {
     if (!levelId) {
       setPackages([]);
@@ -51,9 +45,6 @@ function SubscriptionForm({ student, onClose }) {
     loadPackages();
   }, [levelId]);
 
-  /* ============================================================
-     حفظ الاشتراك
-     ============================================================ */
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
@@ -77,17 +68,14 @@ function SubscriptionForm({ student, onClose }) {
       return;
     }
 
-    /* حساب تاريخ الانتهاء */
     const endDate = new Date();
     endDate.setDate(endDate.getDate() + (pkg.duration_days || 30));
 
-    /* 1. تحديث grade_level_id بتاع الطالب */
     await supabase
       .from('profiles')
       .update({ grade_level_id: levelId })
       .eq('id', student.id);
 
-    /* 2. إضافة اشتراك جديد */
     const { error } = await supabase.from('subscriptions').insert({
       student_id: student.id,
       package_id: packageId,
@@ -119,7 +107,9 @@ function SubscriptionForm({ student, onClose }) {
   return (
     <div className="overlay open" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <button className="close" onClick={onClose}>✕</button>
+        <button className="close" onClick={onClose}>
+          ✕
+        </button>
 
         <h3>💳 تفعيل اشتراك</h3>
         <p className="sub">
@@ -127,7 +117,6 @@ function SubscriptionForm({ student, onClose }) {
         </p>
 
         <form onSubmit={handleSubmit}>
-          {/* المرحلة */}
           <div className="field">
             <label>المرحلة الدراسية</label>
             <select
@@ -144,7 +133,6 @@ function SubscriptionForm({ student, onClose }) {
             </select>
           </div>
 
-          {/* الباقة */}
           <div className="field">
             <label>الباقة</label>
             {!levelId ? (
@@ -170,7 +158,6 @@ function SubscriptionForm({ student, onClose }) {
             )}
           </div>
 
-          {/* معلومات إضافية */}
           {packageId && (
             <div
               style={{
@@ -205,7 +192,10 @@ function SubscriptionForm({ student, onClose }) {
           )}
 
           {msg.text && (
-            <div className={`form-msg ${msg.type}`} style={{ display: 'block' }}>
+            <div
+              className={`form-msg ${msg.type}`}
+              style={{ display: 'block' }}
+            >
               {msg.text}
             </div>
           )}

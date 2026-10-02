@@ -14,8 +14,7 @@ const TIMEOUT_MS = 45000;
 
 const UI_CONFIG = {
   assistantName: 'مساعد بسّطنا 🤖',
-  greeting:
-    'أهلاً! 👋 أنا مساعد «بسّطنا الإنجليزي».\nاسألني في أي حاجة في الإنجليزي: قواعد، ترجمة، تمارين، أو حتى مساعدة في استخدام الموقع.',
+  greeting: 'أهلاً! 👋 أنا مساعد «بسّطنا الإنجليزي».\nاسألني في أي حاجة في الإنجليزي: قواعد، ترجمة، تمارين، أو حتى مساعدة في استخدام الموقع.',
   quickPrompts: [
     'اشرحلي Present Perfect ببساطة',
     'صحّحلي الجملة دي',
@@ -31,33 +30,20 @@ export function AIChatProvider({ children }) {
   const [isOpen, setIsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  /* تحميل التاريخ */
   useEffect(() => {
     try {
       const stored = JSON.parse(localStorage.getItem(LS_HISTORY) || '[]');
       if (Array.isArray(stored)) {
-        setHistory(
-          stored.filter(
-            (m) =>
-              m &&
-              typeof m.content === 'string' &&
-              (m.role === 'user' || m.role === 'assistant')
-          )
-        );
+        setHistory(stored.filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant')));
       }
-    } catch (e) {
-      setHistory([]);
-    }
+    } catch (e) { setHistory([]); }
   }, []);
 
   function saveHistory(newHistory) {
     setHistory(newHistory);
-    try {
-      localStorage.setItem(LS_HISTORY, JSON.stringify(newHistory.slice(-30)));
-    } catch (e) {}
+    try { localStorage.setItem(LS_HISTORY, JSON.stringify(newHistory.slice(-30))); } catch (e) {}
   }
 
-  /* إرسال سؤال */
   async function sendMessage(text) {
     if (!text || !text.trim() || busy) return;
     if (!user) throw new Error('سجّل دخولك الأول');
@@ -70,11 +56,8 @@ export function AIChatProvider({ children }) {
     saveHistory(newHistory);
 
     try {
-      const messages = before
-        .slice(-HISTORY_LIMIT)
-        .concat([{ role: 'user', content: trimmed }]);
+      const messages = before.slice(-HISTORY_LIMIT).concat([{ role: 'user', content: trimmed }]);
 
-      /* 🔐 جيب التوكن */
       let token = '';
       try {
         const { data } = await supabase.auth.getSession();
@@ -104,36 +87,22 @@ export function AIChatProvider({ children }) {
       }
 
       let data = null;
-      try {
-        data = await res.json();
-      } catch (e) {}
+      try { data = await res.json(); } catch (e) {}
 
       if (!res.ok) {
         if (res.status === 401 || (data && data.code === 'LOGIN_REQUIRED')) {
           throw new Error('سجّل دخولك الأول عشان تستخدم المساعد الذكي');
         }
-        if (!data || !data.code) {
-          throw new Error('سيرفر المساعد مش شغّال.');
-        }
+        if (!data || !data.code) throw new Error('سيرفر المساعد مش شغّال.');
         throw new Error(data.error || 'حصلت مشكلة.');
       }
+      if (!data || !data.reply) throw new Error('الرد جه فاضي، جرّب تاني.');
 
-      if (!data || !data.reply) {
-        throw new Error('الرد جه فاضي، جرّب تاني.');
-      }
-
-      const finalHistory = [
-        ...newHistory,
-        { role: 'assistant', content: data.reply },
-      ];
+      const finalHistory = [...newHistory, { role: 'assistant', content: data.reply }];
       saveHistory(finalHistory);
-
       return data.reply;
     } catch (err) {
-      const errorHistory = [
-        ...newHistory,
-        { role: 'assistant', content: '⚠️ ' + (err.message || 'حصلت مشكلة') },
-      ];
+      const errorHistory = [...newHistory, { role: 'assistant', content: '⚠️ ' + (err.message || 'حصلت مشكلة') }];
       saveHistory(errorHistory);
       throw err;
     } finally {
@@ -146,18 +115,12 @@ export function AIChatProvider({ children }) {
   }
 
   const value = {
-    history,
-    isOpen,
-    setIsOpen,
-    busy,
-    sendMessage,
-    clearChat,
+    history, isOpen, setIsOpen, busy,
+    sendMessage, clearChat,
     config: UI_CONFIG,
   };
 
-  return (
-    <AIChatContext.Provider value={value}>{children}</AIChatContext.Provider>
-  );
+  return <AIChatContext.Provider value={value}>{children}</AIChatContext.Provider>;
 }
 
 export function useAIChat() {

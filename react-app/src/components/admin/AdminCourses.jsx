@@ -14,7 +14,8 @@ function AdminCourses() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [msg, setMsg] = useState('');
-  const [lessonsCourse, setLessonsCourse] = useState(null); /* ← للفيديوهات */
+  const [lessonsCourse, setLessonsCourse] = useState(null);
+  const [search, setSearch] = useState('');
 
   const [form, setForm] = useState({
     title_ar: '',
@@ -37,7 +38,9 @@ function AdminCourses() {
     setLoading(false);
   }
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    loadData();
+  }, []);
 
   function openAddModal() {
     setEditing(null);
@@ -92,7 +95,10 @@ function AdminCourses() {
 
     let error;
     if (editing) {
-      ({ error } = await supabase.from('courses').update(payload).eq('id', editing.id));
+      ({ error } = await supabase
+        .from('courses')
+        .update(payload)
+        .eq('id', editing.id));
     } else {
       ({ error } = await supabase.from('courses').insert(payload));
     }
@@ -110,10 +116,12 @@ function AdminCourses() {
 
   async function handleDelete(id) {
     if (!confirm('متأكد إنك عايز تحذف الكورس ده؟')) return;
-    /* امسح الدروس الأول */
     await supabase.from('lessons').delete().eq('course_id', id);
     const { error } = await supabase.from('courses').delete().eq('id', id);
-    if (error) { alert('❌ ' + error.message); return; }
+    if (error) {
+      alert('❌ ' + error.message);
+      return;
+    }
     await loadData();
   }
 
@@ -121,13 +129,36 @@ function AdminCourses() {
     return levels.find((l) => l.id === id)?.name_ar || '—';
   }
 
+  const filteredCourses = courses.filter(
+    (c) =>
+      (c.title_ar || '').toLowerCase().includes(search.toLowerCase()) ||
+      (c.title_en || '').toLowerCase().includes(search.toLowerCase()) ||
+      levelName(c.grade_level_id).toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <>
-      <div className="dash-head">
+      <div className="dash-head" style={{ flexWrap: 'wrap', gap: 10 }}>
         <h1>الكورسات</h1>
-        <button className="btn btn-gold btn-sm" onClick={openAddModal}>
-          + إضافة كورس
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="🔍 ابحث في الكورسات..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              padding: '10px 16px',
+              border: '1.5px solid var(--line)',
+              borderRadius: 999,
+              fontSize: 14,
+              minWidth: 220,
+              background: '#fff',
+            }}
+          />
+          <button className="btn btn-gold btn-sm" onClick={openAddModal}>
+            + إضافة كورس
+          </button>
+        </div>
       </div>
 
       <div className="table-wrap">
@@ -142,13 +173,25 @@ function AdminCourses() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="4"><div className="empty-state">جاري التحميل...</div></td></tr>
-            ) : courses.length === 0 ? (
-              <tr><td colSpan="4"><div className="empty-state">لسه مفيش كورسات</div></td></tr>
+              <tr>
+                <td colSpan="4">
+                  <div className="empty-state">جاري التحميل...</div>
+                </td>
+              </tr>
+            ) : filteredCourses.length === 0 ? (
+              <tr>
+                <td colSpan="4">
+                  <div className="empty-state">
+                    {search ? 'مفيش نتايج' : 'لسه مفيش كورسات'}
+                  </div>
+                </td>
+              </tr>
             ) : (
-              courses.map((c) => (
+              filteredCourses.map((c) => (
                 <tr key={c.id}>
-                  <td><b>{c.title_ar}</b></td>
+                  <td>
+                    <b>{c.title_ar}</b>
+                  </td>
                   <td>{levelName(c.grade_level_id)}</td>
                   <td>{c.content_type === 'link' ? '🎬 كورس' : '📄 ملف'}</td>
                   <td>
@@ -159,8 +202,18 @@ function AdminCourses() {
                     >
                       🎬 الفيديوهات
                     </button>
-                    <button className="icon-btn" onClick={() => openEditModal(c)}>✏️</button>
-                    <button className="icon-btn danger" onClick={() => handleDelete(c.id)}>🗑️</button>
+                    <button
+                      className="icon-btn"
+                      onClick={() => openEditModal(c)}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className="icon-btn danger"
+                      onClick={() => handleDelete(c.id)}
+                    >
+                      🗑️
+                    </button>
                   </td>
                 </tr>
               ))
@@ -169,9 +222,6 @@ function AdminCourses() {
         </table>
       </div>
 
-      {/* ============================================================
-          Modal (إضافة/تعديل كورس)
-          ============================================================ */}
       <AdminFormModal
         open={modalOpen}
         title={editing ? 'تعديل كورس' : 'إضافة كورس'}
@@ -201,12 +251,16 @@ function AdminCourses() {
           <label>المرحلة</label>
           <select
             value={form.grade_level_id}
-            onChange={(e) => setForm({ ...form, grade_level_id: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, grade_level_id: e.target.value })
+            }
             required
           >
             <option value="">— اختار مرحلة —</option>
             {levels.map((lv) => (
-              <option key={lv.id} value={lv.id}>{lv.name_ar}</option>
+              <option key={lv.id} value={lv.id}>
+                {lv.name_ar}
+              </option>
             ))}
           </select>
         </div>
@@ -215,7 +269,9 @@ function AdminCourses() {
           <textarea
             rows="3"
             value={form.description_ar}
-            onChange={(e) => setForm({ ...form, description_ar: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, description_ar: e.target.value })
+            }
           />
         </div>
         <div className="field">
@@ -230,15 +286,12 @@ function AdminCourses() {
         {msg && <div className="form-msg error">{msg}</div>}
       </AdminFormModal>
 
-      {/* ============================================================
-          Modal (إدارة الفيديوهات)
-          ============================================================ */}
       {lessonsCourse && (
         <LessonsManager
           course={lessonsCourse}
           onClose={() => {
             setLessonsCourse(null);
-            loadData(); /* ← تحديث الكورسات */
+            loadData();
           }}
         />
       )}

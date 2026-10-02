@@ -11,13 +11,15 @@ function AdminLevels() {
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [search, setSearch] = useState('');
 
-  const [form, setForm] = useState({ name_ar: '', name_en: '', sort_order: 0 });
+  const [form, setForm] = useState({
+    name_ar: '',
+    name_en: '',
+    sort_order: 0,
+  });
   const [msg, setMsg] = useState('');
 
-  /* ============================================================
-     جلب البيانات
-     ============================================================ */
   async function loadLevels() {
     setLoading(true);
     const { data, error } = await supabase
@@ -29,11 +31,10 @@ function AdminLevels() {
     setLoading(false);
   }
 
-  useEffect(() => { loadLevels(); }, []);
+  useEffect(() => {
+    loadLevels();
+  }, []);
 
-  /* ============================================================
-     فتح Modal للإضافة
-     ============================================================ */
   function openAddModal() {
     setEditing(null);
     setForm({ name_ar: '', name_en: '', sort_order: 0 });
@@ -41,9 +42,6 @@ function AdminLevels() {
     setModalOpen(true);
   }
 
-  /* ============================================================
-     فتح Modal للتعديل
-     ============================================================ */
   function openEditModal(level) {
     setEditing(level);
     setForm({
@@ -55,9 +53,6 @@ function AdminLevels() {
     setModalOpen(true);
   }
 
-  /* ============================================================
-     حفظ
-     ============================================================ */
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
@@ -96,12 +91,12 @@ function AdminLevels() {
     await loadLevels();
   }
 
-  /* ============================================================
-     حذف
-     ============================================================ */
   async function handleDelete(id) {
     if (!confirm('متأكد إنك عايز تحذف المرحلة دي؟')) return;
-    const { error } = await supabase.from('grade_levels').delete().eq('id', id);
+    const { error } = await supabase
+      .from('grade_levels')
+      .delete()
+      .eq('id', id);
     if (error) {
       alert('❌ ' + error.message);
       return;
@@ -109,13 +104,35 @@ function AdminLevels() {
     await loadLevels();
   }
 
+  const filteredLevels = levels.filter(
+    (lv) =>
+      (lv.name_ar || '').toLowerCase().includes(search.toLowerCase()) ||
+      (lv.name_en || '').toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <>
-      <div className="dash-head">
+      <div className="dash-head" style={{ flexWrap: 'wrap', gap: 10 }}>
         <h1>المراحل الدراسية</h1>
-        <button className="btn btn-gold btn-sm" onClick={openAddModal}>
-          + إضافة مرحلة
-        </button>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <input
+            type="text"
+            placeholder="🔍 ابحث في المراحل..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              padding: '10px 16px',
+              border: '1.5px solid var(--line)',
+              borderRadius: 999,
+              fontSize: 14,
+              minWidth: 220,
+              background: '#fff',
+            }}
+          />
+          <button className="btn btn-gold btn-sm" onClick={openAddModal}>
+            + إضافة مرحلة
+          </button>
+        </div>
       </div>
 
       <div className="table-wrap">
@@ -130,18 +147,38 @@ function AdminLevels() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan="4"><div className="empty-state">جاري التحميل...</div></td></tr>
-            ) : levels.length === 0 ? (
-              <tr><td colSpan="4"><div className="empty-state">لسه مفيش مراحل</div></td></tr>
+              <tr>
+                <td colSpan="4">
+                  <div className="empty-state">جاري التحميل...</div>
+                </td>
+              </tr>
+            ) : filteredLevels.length === 0 ? (
+              <tr>
+                <td colSpan="4">
+                  <div className="empty-state">
+                    {search ? 'مفيش نتايج' : 'لسه مفيش مراحل'}
+                  </div>
+                </td>
+              </tr>
             ) : (
-              levels.map((lv) => (
+              filteredLevels.map((lv) => (
                 <tr key={lv.id}>
                   <td>{lv.name_ar}</td>
                   <td>{lv.name_en}</td>
                   <td>{lv.sort_order}</td>
                   <td>
-                    <button className="icon-btn" onClick={() => openEditModal(lv)}>✏️</button>
-                    <button className="icon-btn danger" onClick={() => handleDelete(lv.id)}>🗑️</button>
+                    <button
+                      className="icon-btn"
+                      onClick={() => openEditModal(lv)}
+                    >
+                      ✏️
+                    </button>
+                    <button
+                      className="icon-btn danger"
+                      onClick={() => handleDelete(lv.id)}
+                    >
+                      🗑️
+                    </button>
                   </td>
                 </tr>
               ))
@@ -150,9 +187,6 @@ function AdminLevels() {
         </table>
       </div>
 
-      {/* ============================================================
-          Modal
-          ============================================================ */}
       <AdminFormModal
         open={modalOpen}
         title={editing ? 'تعديل مرحلة' : 'إضافة مرحلة'}

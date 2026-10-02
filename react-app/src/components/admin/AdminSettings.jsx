@@ -27,9 +27,6 @@ function AdminSettings() {
   const [countryDial, setCountryDial] = useState('20');
   const [whatsapp, setWhatsapp] = useState('');
 
-  /* ============================================================
-     جلب الإعدادات
-     ============================================================ */
   useEffect(() => {
     async function load() {
       const { data, error } = await supabase
@@ -47,9 +44,7 @@ function AdminSettings() {
       if (data) {
         setOwnerName(data.owner_name || '');
         const full = data.whatsapp_number || '';
-        /* افصل رمز الدولة عن الرقم */
-        const matched = COUNTRIES
-          .slice()
+        const matched = COUNTRIES.slice()
           .sort((a, b) => b.dial.length - a.dial.length)
           .find((c) => full.startsWith(c.dial));
         if (matched) {
@@ -65,18 +60,12 @@ function AdminSettings() {
     load();
   }, []);
 
-  /* ============================================================
-     تكوين الرقم الكامل
-     ============================================================ */
   function fullPhone() {
     const local = whatsapp.replace(/\D/g, '').replace(/^0+/, '');
     if (!local) return '';
     return countryDial + local;
   }
 
-  /* ============================================================
-     حفظ
-     ============================================================ */
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
@@ -116,7 +105,6 @@ function AdminSettings() {
 
       <div className="card" style={{ maxWidth: 560 }}>
         <form onSubmit={handleSubmit}>
-          {/* اسم الأونر */}
           <div className="field">
             <label>اسم الأونر</label>
             <input
@@ -127,7 +115,6 @@ function AdminSettings() {
             />
           </div>
 
-          {/* رقم واتساب */}
           <div className="field">
             <label>رقم واتساب</label>
             <div className="phone-row">
@@ -149,12 +136,17 @@ function AdminSettings() {
                 inputMode="numeric"
               />
             </div>
-            <small style={{ display: 'block', marginTop: 6, color: 'var(--ink-soft)' }}>
+            <small
+              style={{
+                display: 'block',
+                marginTop: 6,
+                color: 'var(--ink-soft)',
+              }}
+            >
               الرقم الكامل: <b>+{fullPhone() || '—'}</b>
             </small>
           </div>
 
-          {/* زر الحفظ */}
           <button
             className="btn btn-teal btn-block"
             type="submit"
@@ -163,24 +155,36 @@ function AdminSettings() {
             {saving ? 'جاري الحفظ...' : '💾 حفظ'}
           </button>
 
-          {/* رسالة */}
           {msg.text && (
-            <div className={`form-msg ${msg.type}`} style={{ display: 'block' }}>
+            <div
+              className={`form-msg ${msg.type}`}
+              style={{ display: 'block' }}
+            >
               {msg.text}
             </div>
           )}
         </form>
       </div>
 
-      {/* معلومات إضافية */}
       <div className="card" style={{ maxWidth: 560, marginTop: 20 }}>
         <h3 style={{ marginTop: 0, color: 'var(--navy-deep)' }}>ℹ️ معلومات</h3>
         <p style={{ color: 'var(--ink-soft)', fontSize: 14 }}>
           الإعدادات دي بتظهر في كل الموقع:
         </p>
-        <ul style={{ color: 'var(--ink-soft)', fontSize: 14, paddingInlineStart: 20 }}>
-          <li><b>اسم الأونر:</b> يظهر في الفوتر وصفحات الموقع.</li>
-          <li><b>رقم واتساب:</b> يظهر في زرار الواتساب العائم وفي روابط الاشتراك.</li>
+        <ul
+          style={{
+            color: 'var(--ink-soft)',
+            fontSize: 14,
+            paddingInlineStart: 20,
+          }}
+        >
+          <li>
+            <b>اسم الأونر:</b> يظهر في الفوتر وصفحات الموقع.
+          </li>
+          <li>
+            <b>رقم واتساب:</b> يظهر في زرار الواتساب العائم وفي روابط
+            الاشتراك.
+          </li>
         </ul>
       </div>
     </>

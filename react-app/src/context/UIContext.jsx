@@ -1,5 +1,5 @@
 /* ============================================================
-   🎨 UIContext — إدارة حالة الواجهة
+   🎨 UIContext — إدارة حالة الواجهة (مع Dark Mode)
    ============================================================ */
 import { createContext, useContext, useEffect, useState } from 'react';
 
@@ -8,6 +8,7 @@ const UIContext = createContext(null);
 export function UIProvider({ children }) {
   const [lang, setLang] = useState(() => localStorage.getItem('basetna_lang') || 'ar');
   const [gender, setGender] = useState(() => localStorage.getItem('basetna_gender') || null);
+  const [theme, setTheme] = useState(() => localStorage.getItem('basetna_theme') || 'light');
   const [showWelcome, setShowWelcome] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
   const [supportType, setSupportType] = useState('support');
@@ -17,6 +18,15 @@ export function UIProvider({ children }) {
     if (!stored) setShowWelcome(true);
     else setGender(stored);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('basetna_theme', theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme(theme === 'light' ? 'dark' : 'light');
+  }
 
   function toggleLanguage() {
     const newLang = lang === 'ar' ? 'en' : 'ar';
@@ -44,6 +54,7 @@ export function UIProvider({ children }) {
 
   const value = {
     lang, toggleLanguage,
+    theme, toggleTheme,
     gender, pickGender, openWelcomeAgain,
     showWelcome, setShowWelcome,
     showSupport, setShowSupport,

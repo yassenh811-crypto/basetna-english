@@ -1,10 +1,5 @@
 /* ============================================================
    🆘 SupportFabs — أزرار الدعم العائمة
-   ------------------------------------------------------------
-   - 💬 الغرفة العامة
-   - 👩‍🏫 الميس
-   - 🛠️ الدعم الفني
-   - 🤖 المساعد الذكي (للمسجلين بس)
    ============================================================ */
 import { useUI } from '../context/UIContext';
 import { useAuth } from '../context/AuthContext';
@@ -17,7 +12,6 @@ function SupportFabs() {
 
   return (
     <div className="support-fabs">
-      {/* AI Assistant: للمسجلين بس */}
       {user && (
         <button
           className={`bai-fab ${isOpen ? 'active' : ''}`}
@@ -31,7 +25,6 @@ function SupportFabs() {
         </button>
       )}
 
-      {/* General Chat */}
       <button
         className="support-fab support-fab-general"
         title="الغرفة العامة"
@@ -41,7 +34,6 @@ function SupportFabs() {
         <span className="fab-label">عام</span>
       </button>
 
-      {/* Owner */}
       <button
         className="support-fab support-fab-owner"
         title="مس. شيرهان علي"
@@ -51,7 +43,6 @@ function SupportFabs() {
         <span className="fab-label">الميس</span>
       </button>
 
-      {/* Support */}
       <button
         className="support-fab support-fab-support"
         title="الدعم الفني"

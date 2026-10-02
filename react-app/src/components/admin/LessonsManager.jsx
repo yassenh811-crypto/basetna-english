@@ -11,9 +11,6 @@ function LessonsManager({ course, onClose }) {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
 
-  /* ============================================================
-     جلب الفيديوهات
-     ============================================================ */
   async function loadLessons() {
     setLoading(true);
     const { data, error } = await supabase
@@ -30,9 +27,6 @@ function LessonsManager({ course, onClose }) {
     loadLessons();
   }, [course.id]);
 
-  /* ============================================================
-     حذف فيديو
-     ============================================================ */
   async function handleDelete(id) {
     if (!confirm('متأكد إنك عايز تحذف الفيديو ده؟')) return;
     const { error } = await supabase.from('lessons').delete().eq('id', id);
@@ -43,18 +37,12 @@ function LessonsManager({ course, onClose }) {
     await loadLessons();
   }
 
-  /* ============================================================
-     إغلاق الفورم
-     ============================================================ */
   function handleFormClose() {
     setShowForm(false);
     setEditing(null);
     loadLessons();
   }
 
-  /* ============================================================
-     عرض صورة الفيديو
-     ============================================================ */
   function getThumbnail(type, url) {
     if (type === 'youtube') {
       const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/);
@@ -81,7 +69,6 @@ function LessonsManager({ course, onClose }) {
           عدد الفيديوهات: <b>{lessons.length}</b>
         </p>
 
-        {/* زرار إضافة */}
         <button
           className="btn btn-gold btn-block"
           style={{ marginBottom: 16 }}
@@ -90,7 +77,6 @@ function LessonsManager({ course, onClose }) {
           ➕ إضافة فيديو جديد
         </button>
 
-        {/* قايمة الفيديوهات */}
         {loading ? (
           <div className="empty-state">جاري التحميل...</div>
         ) : lessons.length === 0 ? (
@@ -112,7 +98,6 @@ function LessonsManager({ course, onClose }) {
                     alignItems: 'center',
                   }}
                 >
-                  {/* صورة */}
                   <div style={{
                     width: 100,
                     height: 60,
@@ -131,7 +116,6 @@ function LessonsManager({ course, onClose }) {
                     )}
                   </div>
 
-                  {/* معلومات */}
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 800, color: 'var(--navy-deep)', marginBottom: 4 }}>
                       {i + 1}. {l.title_ar}
@@ -145,12 +129,11 @@ function LessonsManager({ course, onClose }) {
                       {l.video_type === 'youtube' ? '▶️ يوتيوب' :
                        l.video_type === 'vimeo' ? '🎥 فيميو' :
                        l.video_type === 'drive' ? '📁 درايف' :
-                       '📱 ملف'} 
+                       '📱 ملف'}
                       {l.duration_min > 0 && ` · ⏱️ ${l.duration_min} دقيقة`}
                     </div>
                   </div>
 
-                  {/* أزرار */}
                   <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                     <button
                       className="icon-btn"
@@ -172,9 +155,6 @@ function LessonsManager({ course, onClose }) {
         )}
       </div>
 
-      {/* ============================================================
-          Form (إضافة/تعديل فيديو)
-          ============================================================ */}
       {showForm && (
         <LessonForm
           courseId={course.id}

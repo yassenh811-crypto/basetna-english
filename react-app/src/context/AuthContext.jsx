@@ -1,5 +1,5 @@
 /* ============================================================
-   🔐 AuthContext — إدارة تسجيل الدخول (مُصلَح)
+   🔐 AuthContext — إدارة تسجيل الدخول
    ============================================================ */
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { supabase } from '../services/supabase';
@@ -12,29 +12,22 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [showAuthModal, setShowAuthModal] = useState(false);
 
-  /* ============================================================
-     جلب الـ profile
-     ============================================================ */
   const loadProfile = useCallback(async (userId) => {
     if (!userId) {
       setProfile(null);
       return;
     }
-    console.log('🔍 [Auth] Loading profile for:', userId);
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .maybeSingle();
-
       if (error) {
         console.error('❌ [Auth] Profile error:', error);
         setProfile(null);
         return;
       }
-
-      console.log('✅ [Auth] Profile loaded:', data);
       setProfile(data);
     } catch (err) {
       console.error('❌ [Auth] Catch:', err);
@@ -42,22 +35,14 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  /* ============================================================
-     التهيئة الأولية
-     ============================================================ */
   useEffect(() => {
     let mounted = true;
 
     async function init() {
-      console.log('🔍 [Auth] Init...');
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) throw error;
-
-        console.log('🔍 [Auth] Session:', session?.user?.id);
-
         if (!mounted) return;
-
         if (session?.user) {
           setUser(session.user);
           await loadProfile(session.user.id);
@@ -74,12 +59,9 @@ export function AuthProvider({ children }) {
 
     init();
 
-    /* مراقبة التغييرات */
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('🔍 [Auth] Auth change:', event, session?.user?.id);
+      async (_event, session) => {
         if (!mounted) return;
-
         if (session?.user) {
           setUser(session.user);
           await loadProfile(session.user.id);
@@ -97,17 +79,11 @@ export function AuthProvider({ children }) {
     };
   }, [loadProfile]);
 
-  /* ============================================================
-     تسجيل دخول
-     ============================================================ */
   async function signIn(email, password) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
   }
 
-  /* ============================================================
-     تسجيل خروج
-     ============================================================ */
   async function signOut() {
     await supabase.auth.signOut();
     setUser(null);

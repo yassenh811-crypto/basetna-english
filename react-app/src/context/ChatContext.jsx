@@ -13,19 +13,14 @@ export function ChatProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [currentRoom, setCurrentRoom] = useState('general');
   const [privateWith, setPrivateWith] = useState(null);
-
-  /* عشان نمنع الـ Loop */
   const loadingRef = useRef(false);
 
-  /* ============================================================
-     جلب الرسائل
-     ============================================================ */
   const loadMessages = useCallback(async (room, privateUserId = null) => {
     if (!user) {
       setMessages([]);
       return;
     }
-    if (loadingRef.current) return; /* ← منع التكرار */
+    if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
 
@@ -56,9 +51,6 @@ export function ChatProvider({ children }) {
     }
   }, [user]);
 
-  /* ============================================================
-     إرسال رسالة
-     ============================================================ */
   const sendMessage = useCallback(async (content, room, privateUserId = null) => {
     if (!user || !profile) return;
     const trimmed = (content || '').trim();
@@ -77,17 +69,11 @@ export function ChatProvider({ children }) {
     if (error) throw error;
   }, [user, profile]);
 
-  /* ============================================================
-     فتح غرفة
-     ============================================================ */
   const openRoom = useCallback((room, privateUserId = null) => {
     setCurrentRoom(room);
     setPrivateWith(privateUserId);
   }, []);
 
-  /* ============================================================
-     تحميل الرسائل لما تتغير الغرفة أو المستخدم
-     ============================================================ */
   useEffect(() => {
     if (user) {
       loadMessages(currentRoom, privateWith);
@@ -96,12 +82,8 @@ export function ChatProvider({ children }) {
     }
   }, [user, currentRoom, privateWith, loadMessages]);
 
-  /* ============================================================
-     Realtime
-     ============================================================ */
   useEffect(() => {
     if (!user) return;
-
     const channel = supabase
       .channel('messages-realtime')
       .on(
@@ -109,13 +91,11 @@ export function ChatProvider({ children }) {
         { event: 'INSERT', schema: 'public', table: 'messages' },
         (payload) => {
           const m = payload.new;
-          /* ضيف الرسالة لو في نفس الغرفة */
           if (
             (currentRoom === 'private' && m.recipient_role === 'private') ||
             (m.recipient_role === currentRoom)
           ) {
             setMessages((prev) => {
-              /* منع التكرار */
               if (prev.some((x) => x.id === m.id)) return prev;
               return [...prev, m];
             });
@@ -124,18 +104,12 @@ export function ChatProvider({ children }) {
       )
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => supabase.removeChannel(channel);
   }, [user, currentRoom]);
 
   const value = {
-    messages,
-    loading,
-    currentRoom,
-    privateWith,
-    sendMessage,
-    openRoom,
+    messages, loading, currentRoom, privateWith,
+    sendMessage, openRoom,
   };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;

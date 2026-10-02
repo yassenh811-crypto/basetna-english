@@ -9,7 +9,6 @@ import { ChatProvider } from './context/ChatContext';
 import { AIChatProvider } from './context/AIChatContext';
 import { useRole } from './hooks/useRole';
 
-/* Components */
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import WhatsAppFloat from './components/WhatsAppFloat';
@@ -19,53 +18,28 @@ import AuthModal from './components/AuthModal';
 import SupportModal from './components/SupportModal';
 import AIChat from './components/AIChat';
 
-/* Pages */
 import Home from './pages/Home';
 import AdminDashboard from './pages/AdminDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 
-/* ============================================================
-   🛡️ Protected Admin
-   ============================================================ */
 function ProtectedAdmin({ children }) {
   const { loading } = useAuth();
   const { isAdmin } = useRole();
-
-  if (loading) {
-    return (
-      <div className="empty-state" style={{ padding: 80 }}>
-        جاري التحميل...
-      </div>
-    );
-  }
+  if (loading) return <div className="empty-state" style={{ padding: 80 }}>جاري التحميل...</div>;
   if (!isAdmin) return <Navigate to="/" replace />;
   return children;
 }
 
-/* ============================================================
-   🛡️ Protected Student
-   ============================================================ */
 function ProtectedStudent({ children }) {
   const { loading } = useAuth();
   const { isStudent, isAdmin } = useRole();
-
-  if (loading) {
-    return (
-      <div className="empty-state" style={{ padding: 80 }}>
-        جاري التحميل...
-      </div>
-    );
-  }
-  /* الأدمن يقدر يدخل برضه (للمعاينة) */
+  if (loading) return <div className="empty-state" style={{ padding: 80 }}>جاري التحميل...</div>;
   if (!isStudent && !isAdmin) return <Navigate to="/" replace />;
   return children;
 }
 
-/* ============================================================
-   🔄 AutoRedirect — يوجه المستخدم تلقائياً حسب دوره
-   ============================================================ */
 function AutoRedirect() {
-  const { user, loading: authLoading } = useAuth();
+  const { loading: authLoading } = useAuth();
   const { isAdmin, isStudent, profile } = useRole();
   const location = useLocation();
 
@@ -85,54 +59,30 @@ function AutoRedirect() {
   return null;
 }
 
-/* ============================================================
-   🧩 AppContent
-   ============================================================ */
 function AppContent() {
   const location = useLocation();
   const isDashboard =
-    location.pathname.startsWith('/admin') ||
-    location.pathname.startsWith('/student');
+    location.pathname.startsWith('/admin') || location.pathname.startsWith('/student');
 
   return (
     <>
-      {/* AutoRedirect: يوجه المستخدم تلقائياً */}
       <AutoRedirect />
 
-      {/* Navbar: يظهر بس في الصفحات العامة */}
       {!isDashboard && <Navbar />}
 
-      {/* Routes */}
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route
-          path="/admin/*"
-          element={
-            <ProtectedAdmin>
-              <AdminDashboard />
-            </ProtectedAdmin>
-          }
-        />
-        <Route
-          path="/student"
-          element={
-            <ProtectedStudent>
-              <StudentDashboard />
-            </ProtectedStudent>
-          }
-        />
+        <Route path="/admin/*" element={<ProtectedAdmin><AdminDashboard /></ProtectedAdmin>} />
+        <Route path="/student" element={<ProtectedStudent><StudentDashboard /></ProtectedStudent>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      {/* Footer + Support + WhatsApp + AI: بس في الصفحات العامة */}
       {!isDashboard && <Footer />}
 
-{/* الأزرار العائمة: في كل الصفحات ما عدا Navbar في الداشبورد */}
-<WhatsAppFloat />
-<SupportFabs />
-<AIChat />
+      <WhatsAppFloat />
+      <SupportFabs />
+      <AIChat />
 
-      {/* Modals: دايماً موجودة */}
       <WelcomeModal />
       <AuthModal />
       <SupportModal />
@@ -140,9 +90,6 @@ function AppContent() {
   );
 }
 
-/* ============================================================
-   🚀 App
-   ============================================================ */
 function App() {
   return (
     <UIProvider>

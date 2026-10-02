@@ -1,5 +1,17 @@
+# متغيرات البيئة
 .env
+.env.local
+.env.*.local
+vars.json
+
+# Vercel
+.vercel/
+
+# مكتبات Node
 node_modules/
-package-lock.json
 dist/
-build/
+.vite/
+
+# ملفات مؤقتة
+*.log
+.DS_Store

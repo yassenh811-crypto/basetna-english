@@ -1,19 +1,39 @@
+/* ============================================================
+   💬 WhatsAppFloat — زرار واتساب عائم
+   ============================================================ */
 import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 
 function WhatsAppFloat() {
   const [whatsappNumber, setWhatsappNumber] = useState(null);
 
+  async function loadNumber() {
+    const { data } = await supabase
+      .from('settings')
+      .select('whatsapp_number')
+      .eq('id', 1)
+      .maybeSingle();
+    if (data?.whatsapp_number) setWhatsappNumber(data.whatsapp_number);
+  }
+
   useEffect(() => {
-    async function loadNumber() {
-      const { data } = await supabase
-        .from('settings')
-        .select('whatsapp_number')
-        .eq('id', 1)
-        .maybeSingle();
-      if (data?.whatsapp_number) setWhatsappNumber(data.whatsapp_number);
-    }
     loadNumber();
+
+    /* استمع لتغييرات جدول settings */
+    const channel = supabase
+      .channel('settings-changes')
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'settings' },
+        (payload) => {
+          if (payload.new?.whatsapp_number) {
+            setWhatsappNumber(payload.new.whatsapp_number);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
   }, []);
 
   function handleClick(e) {

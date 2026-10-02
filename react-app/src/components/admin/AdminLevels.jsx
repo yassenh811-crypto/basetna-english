@@ -1,30 +1,123 @@
+/* ============================================================
+   📚 AdminLevels — إدارة المراحل الدراسية
+   ============================================================ */
 import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabase';
+import AdminFormModal from './AdminFormModal';
 
 function AdminLevels() {
   const [levels, setLevels] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
 
+  const [form, setForm] = useState({ name_ar: '', name_en: '', sort_order: 0 });
+  const [msg, setMsg] = useState('');
+
+  /* ============================================================
+     جلب البيانات
+     ============================================================ */
   async function loadLevels() {
     setLoading(true);
-    const { data } = await supabase.from('grade_levels').select('*').order('sort_order');
+    const { data, error } = await supabase
+      .from('grade_levels')
+      .select('*')
+      .order('sort_order');
+    if (error) console.error(error);
     setLevels(data || []);
     setLoading(false);
   }
 
   useEffect(() => { loadLevels(); }, []);
 
+  /* ============================================================
+     فتح Modal للإضافة
+     ============================================================ */
+  function openAddModal() {
+    setEditing(null);
+    setForm({ name_ar: '', name_en: '', sort_order: 0 });
+    setMsg('');
+    setModalOpen(true);
+  }
+
+  /* ============================================================
+     فتح Modal للتعديل
+     ============================================================ */
+  function openEditModal(level) {
+    setEditing(level);
+    setForm({
+      name_ar: level.name_ar || '',
+      name_en: level.name_en || '',
+      sort_order: level.sort_order ?? 0,
+    });
+    setMsg('');
+    setModalOpen(true);
+  }
+
+  /* ============================================================
+     حفظ
+     ============================================================ */
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setSaving(true);
+    setMsg('');
+
+    const payload = {
+      name_ar: form.name_ar.trim(),
+      name_en: form.name_en.trim(),
+      sort_order: Number(form.sort_order) || 0,
+    };
+
+    if (!payload.name_ar || !payload.name_en) {
+      setMsg('❌ لازم تملأ الاسمين');
+      setSaving(false);
+      return;
+    }
+
+    let error;
+    if (editing) {
+      ({ error } = await supabase
+        .from('grade_levels')
+        .update(payload)
+        .eq('id', editing.id));
+    } else {
+      ({ error } = await supabase.from('grade_levels').insert(payload));
+    }
+
+    setSaving(false);
+
+    if (error) {
+      setMsg('❌ ' + error.message);
+      return;
+    }
+
+    setModalOpen(false);
+    await loadLevels();
+  }
+
+  /* ============================================================
+     حذف
+     ============================================================ */
   async function handleDelete(id) {
-    if (!confirm('متأكد؟')) return;
-    await supabase.from('grade_levels').delete().eq('id', id);
-    loadLevels();
+    if (!confirm('متأكد إنك عايز تحذف المرحلة دي؟')) return;
+    const { error } = await supabase.from('grade_levels').delete().eq('id', id);
+    if (error) {
+      alert('❌ ' + error.message);
+      return;
+    }
+    await loadLevels();
   }
 
   return (
     <>
       <div className="dash-head">
         <h1>المراحل الدراسية</h1>
+        <button className="btn btn-gold btn-sm" onClick={openAddModal}>
+          + إضافة مرحلة
+        </button>
       </div>
+
       <div className="table-wrap">
         <table>
           <thead>
@@ -47,6 +140,7 @@ function AdminLevels() {
                   <td>{lv.name_en}</td>
                   <td>{lv.sort_order}</td>
                   <td>
+                    <button className="icon-btn" onClick={() => openEditModal(lv)}>✏️</button>
                     <button className="icon-btn danger" onClick={() => handleDelete(lv.id)}>🗑️</button>
                   </td>
                 </tr>
@@ -55,6 +149,45 @@ function AdminLevels() {
           </tbody>
         </table>
       </div>
+
+      {/* ============================================================
+          Modal
+          ============================================================ */}
+      <AdminFormModal
+        open={modalOpen}
+        title={editing ? 'تعديل مرحلة' : 'إضافة مرحلة'}
+        onClose={() => setModalOpen(false)}
+        onSubmit={handleSubmit}
+        loading={saving}
+      >
+        <div className="field">
+          <label>الاسم (عربي)</label>
+          <input
+            type="text"
+            value={form.name_ar}
+            onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
+            required
+          />
+        </div>
+        <div className="field">
+          <label>Name (English)</label>
+          <input
+            type="text"
+            value={form.name_en}
+            onChange={(e) => setForm({ ...form, name_en: e.target.value })}
+            required
+          />
+        </div>
+        <div className="field">
+          <label>الترتيب</label>
+          <input
+            type="number"
+            value={form.sort_order}
+            onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
+          />
+        </div>
+        {msg && <div className="form-msg error">{msg}</div>}
+      </AdminFormModal>
     </>
   );
 }

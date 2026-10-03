@@ -1,12 +1,12 @@
 /* ============================================================
    🖥️ server.js — سيرفر Basetna English
    ------------------------------------------------------------
-   - بيقرأ المفاتيح من .env (GEMINI_API_KEY_1, _2, _3...)
+   - بيقرأ المفاتيح من .env
    - نظام تدوير ذكي: لو مفتاح خلص، يروح للتاني
    - التحقق من تسجيل الدخول (Supabase)
-   - /api/ai       → المساعد الذكي
-   - /api/generate-quiz → توليد امتحانات من الدروس
-   - /api/health   → فحص الحالة
+   - /api/ai              → المساعد الذكي
+   - /api/generate-quiz   → توليد امتحانات من الدروس
+   - /api/health          → فحص الحالة
    ============================================================ */
 
 require('dotenv').config();
@@ -123,10 +123,18 @@ class KeyManager {
     s.failCount++;
     s.lastFail = reason;
 
-    if (reason.includes('429') || reason.includes('quota') || reason.includes('rate')) {
+    if (
+      reason.includes('429') ||
+      reason.includes('quota') ||
+      reason.includes('rate')
+    ) {
       s.cooldownUntil = Date.now() + 60 * 1000;
       console.log(`⏸️  المفتاح #${this.currentIndex + 1} في cooldown لمدة دقيقة`);
-    } else if (reason.includes('API key') || reason.includes('403') || reason.includes('PERMISSION')) {
+    } else if (
+      reason.includes('API key') ||
+      reason.includes('403') ||
+      reason.includes('PERMISSION')
+    ) {
       s.valid = false;
       console.log(`❌ المفتاح #${this.currentIndex + 1} معطّل نهائي`);
     } else if (s.failCount >= 5) {
@@ -285,7 +293,9 @@ app.post('/api/ai', async (req, res) => {
 
     const { messages } = req.body || {};
     if (!Array.isArray(messages) || messages.length === 0) {
-      return res.status(400).json({ code: 'BAD_REQUEST', error: 'لازم تبعت messages (array)' });
+      return res
+        .status(400)
+        .json({ code: 'BAD_REQUEST', error: 'لازم تبعت messages (array)' });
     }
 
     const reply = await askGemini(messages);
@@ -300,12 +310,18 @@ app.post('/api/ai', async (req, res) => {
       });
     }
     if (err.message?.includes('API key') || err.message?.includes('403')) {
-      return res.status(500).json({ code: 'BAD_KEY', error: 'مفتاح Gemini غلط أو منتهي' });
+      return res
+        .status(500)
+        .json({ code: 'BAD_KEY', error: 'مفتاح Gemini غلط أو منتهي' });
     }
     if (err.message?.includes('429') || err.message?.includes('quota')) {
-      return res.status(429).json({ code: 'RATE_LIMIT', error: 'الحد المسموح خلص، جرب بعد شوية' });
+      return res
+        .status(429)
+        .json({ code: 'RATE_LIMIT', error: 'الحد المسموح خلص، جرب بعد شوية' });
     }
-    res.status(500).json({ code: 'SERVER_ERROR', error: err.message || 'حصلت مشكلة' });
+    res
+      .status(500)
+      .json({ code: 'SERVER_ERROR', error: err.message || 'حصلت مشكلة' });
   }
 });
 
@@ -325,7 +341,9 @@ app.post('/api/generate-quiz', async (req, res) => {
     const { lessonTitle, lessonDescription, lessonDuration } = req.body;
 
     if (!lessonTitle) {
-      return res.status(400).json({ code: 'BAD_REQUEST', error: 'محتاج عنوان الدرس' });
+      return res
+        .status(400)
+        .json({ code: 'BAD_REQUEST', error: 'محتاج عنوان الدرس' });
     }
 
     const prompt = `أنت مدرس إنجليزي محترف. اعمل امتحان قصير (5 أسئلة اختيار من متعدد) عن الدرس التالي:
@@ -339,7 +357,6 @@ app.post('/api/generate-quiz', async (req, res) => {
 - 4 خيارات لكل سؤال.
 - تحديد الإجابة الصحيحة (رقم 0-3).
 - الأسئلة تكون متنوعة (قواعد، مفردات، فهم).
-- الأسئلة تكون مناسبة للمستوى.
 
 ⚠️ مهم جداً: رد بـ JSON بس، من غير أي كلام تاني أو شرح. الشكل بالظبط:
 
@@ -411,11 +428,11 @@ app.listen(PORT, () => {
   console.log('==============================================');
   console.log('🖥️  بسّطنا الإنجليزي — السيرفر شغال');
   console.log('==============================================');
-  console.log(`🌐 الموقع:    http://localhost:${PORT}`);
-  console.log(`🤖 المساعد:   http://localhost:${PORT}/api/ai`);
+  console.log(`🌐 الموقع:     http://localhost:${PORT}`);
+  console.log(`🤖 المساعد:    http://localhost:${PORT}/api/ai`);
   console.log(`🎓 الامتحانات: http://localhost:${PORT}/api/generate-quiz`);
-  console.log(`🏥 الحالة:    http://localhost:${PORT}/api/health`);
-  console.log(`🔑 المفاتيح:  ${API_KEYS.length} مفتاح`);
-  console.log(`🤖 الموديل:   ${MODEL_NAME}`);
+  console.log(`🏥 الحالة:     http://localhost:${PORT}/api/health`);
+  console.log(`🔑 المفاتيح:   ${API_KEYS.length} مفتاح`);
+  console.log(`🤖 الموديل:    ${MODEL_NAME}`);
   console.log('==============================================');
 });

@@ -1,10 +1,17 @@
 /* ============================================================
-   🎬 CoursePlayer — مشغل الكورس (الفيديو التقديمي + الدروس + التعليقات)
+   🎬 CoursePlayer — مشغل الكورس (كامل مع كل الميزات)
+   ------------------------------------------------------------
+   - الفيديو التقديمي + الدروس
+   - Progress Bar + علامة ✓
+   - التقييم
+   - التعليقات
+   - امتحان الدرس (AI)
    ============================================================ */
 import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import Comments from './Comments';
+import LessonQuiz from './LessonQuiz';
 
 /* ============================================================
    استخراج ID من روابط الفيديو
@@ -48,6 +55,7 @@ function CoursePlayer({ course, onClose }) {
   const [ratingStats, setRatingStats] = useState({ avg: 0, count: 0 });
   const [watchedIds, setWatchedIds] = useState(new Set());
   const [progress, setProgress] = useState({ watched: 0, total: 0, pct: 0 });
+  const [showQuiz, setShowQuiz] = useState(false);
 
   /* ============================================================
      جلب الدروس + التقييمات + التقدم
@@ -66,7 +74,7 @@ function CoursePlayer({ course, onClose }) {
 
       const lessonsData = lessonsRes.data || [];
 
-      /* ✅ ضيف الفيديو التقديمي في الأول */
+      /* ضيف الفيديو التقديمي في الأول */
       const introLesson = {
         id: '__intro__',
         title_ar: '🎬 الفيديو التقديمي',
@@ -128,6 +136,7 @@ function CoursePlayer({ course, onClose }) {
      ============================================================ */
   async function playLesson(lesson) {
     setActiveLesson(lesson);
+    setShowQuiz(false);
 
     /* الفيديو التقديمي مش بيتحسب في التقدم */
     if (lesson.is_intro) return;
@@ -181,7 +190,6 @@ function CoursePlayer({ course, onClose }) {
 
     const { video_type, video_url } = activeLesson;
 
-    /* YouTube */
     if (video_type === 'youtube') {
       const id = extractYouTubeId(video_url);
       return id ? (
@@ -196,24 +204,15 @@ function CoursePlayer({ course, onClose }) {
       ) : (
         <div style={{ padding: 20, color: '#fff', textAlign: 'center' }}>
           <p>⚠️ رابط YouTube غلط</p>
-          <a href={video_url} target="_blank" rel="noopener" style={{ color: 'var(--gold-soft)' }}>
-            افتح الرابط خارج الموقع
-          </a>
+          <a href={video_url} target="_blank" rel="noopener" style={{ color: 'var(--gold-soft)' }}>افتح الرابط خارج الموقع</a>
         </div>
       );
     }
 
-    /* Vimeo */
     if (video_type === 'vimeo') {
       const m = video_url.match(/vimeo\.com\/(\d+)/);
       return m ? (
-        <iframe
-          src={`https://player.vimeo.com/video/${m[1]}?autoplay=1`}
-          width="100%"
-          height="100%"
-          frameBorder="0"
-          allow="autoplay; fullscreen"
-        ></iframe>
+        <iframe src={`https://player.vimeo.com/video/${m[1]}?autoplay=1`} width="100%" height="100%" frameBorder="0" allow="autoplay; fullscreen"></iframe>
       ) : (
         <div style={{ padding: 20, color: '#fff', textAlign: 'center' }}>
           <p>⚠️ رابط Vimeo غلط</p>
@@ -221,52 +220,28 @@ function CoursePlayer({ course, onClose }) {
       );
     }
 
-    /* Google Drive */
     if (video_type === 'drive') {
       const m = video_url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=)([A-Za-z0-9_-]+)/);
       return m ? (
-        <iframe
-          src={`https://drive.google.com/file/d/${m[1]}/preview`}
-          width="100%"
-          height="100%"
-          frameBorder="0"
-          allow="autoplay"
-        ></iframe>
+        <iframe src={`https://drive.google.com/file/d/${m[1]}/preview`} width="100%" height="100%" frameBorder="0" allow="autoplay"></iframe>
       ) : (
         <div style={{ padding: 20, color: '#fff', textAlign: 'center' }}>
           <p>⚠️ رابط Google Drive غلط</p>
-          <a href={video_url} target="_blank" rel="noopener" style={{ color: 'var(--gold-soft)' }}>
-            افتح الرابط خارج الموقع
-          </a>
         </div>
       );
     }
 
-    /* رابط مباشر */
     if (video_type === 'link' || video_type === 'file') {
       if (/\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(video_url)) {
-        return (
-          <video src={video_url} controls autoPlay style={{ width: '100%', height: '100%' }}></video>
-        );
+        return <video src={video_url} controls autoPlay style={{ width: '100%', height: '100%' }}></video>;
       }
-      return (
-        <iframe
-          src={video_url}
-          width="100%"
-          height="100%"
-          frameBorder="0"
-          allow="autoplay; fullscreen"
-        ></iframe>
-      );
+      return <iframe src={video_url} width="100%" height="100%" frameBorder="0" allow="autoplay; fullscreen"></iframe>;
     }
 
-    /* Fallback */
     return (
       <div style={{ padding: 20, color: '#fff', textAlign: 'center' }}>
         <p>⚠️ نوع الفيديو مش مدعوم</p>
-        <a href={video_url} target="_blank" rel="noopener" style={{ color: 'var(--gold-soft)' }}>
-          افتح الرابط خارج الموقع
-        </a>
+        <a href={video_url} target="_blank" rel="noopener" style={{ color: 'var(--gold-soft)' }}>افتح الرابط خارج الموقع</a>
       </div>
     );
   }
@@ -374,9 +349,29 @@ function CoursePlayer({ course, onClose }) {
           {myRating && <p className="rating-thanks">شكراً لتقييمك 💛</p>}
         </div>
 
-        {/* ✅ التعليقات — للمسجلين دخول بس */}
+        {/* ✅ زرار الامتحان — للمسجلين دخول بس، ومش للفيديو التقديمي */}
+        {profile && activeLesson && !activeLesson.is_intro && (
+          <div style={{ padding: '16px 20px', borderTop: '1px solid var(--line)', textAlign: 'center' }}>
+            <button
+              className="btn btn-teal btn-block"
+              onClick={() => setShowQuiz(true)}
+            >
+              🎓 ابدأ امتحان الدرس
+            </button>
+          </div>
+        )}
+
+        {/* ✅ التعليقات — للمسجلين دخول بس، ومش للفيديو التقديمي */}
         {profile && activeLesson && !activeLesson.is_intro && (
           <Comments lessonId={activeLesson.id} />
+        )}
+
+        {/* ✅ نافذة الامتحان */}
+        {showQuiz && activeLesson && (
+          <LessonQuiz
+            lesson={activeLesson}
+            onClose={() => setShowQuiz(false)}
+          />
         )}
       </div>
     </div>

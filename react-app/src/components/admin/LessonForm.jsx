@@ -1,11 +1,22 @@
 /* ============================================================
    📹 LessonForm — إضافة/تعديل فيديو (مع Progress Bar)
    ============================================================ */
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabase';
 
 const BUCKET = 'course-files';
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
+
+const PLACEHOLDER = {
+  youtube: 'https://youtu.be/...',
+  vimeo: 'https://vimeo.com/...',
+  drive: 'https://drive.google.com/file/d/.../view',
+  link: 'https://example.com/video.mp4',
+};
+
+const isDriveUrl = (u) =>
+  /drive\.google\.com\/file\/d\/[A-Za-z0-9_-]+/.test(u) ||
+  /drive\.google\.com\/(?:open|uc)\?(?:[^#]*&)?id=[A-Za-z0-9_-]+/.test(u);
 
 function LessonForm({ courseId, lesson, onClose }) {
   const editing = !!lesson;
@@ -22,6 +33,14 @@ function LessonForm({ courseId, lesson, onClose }) {
   const [progress, setProgress] = useState(0);
   const [msg, setMsg] = useState({ text: '', type: '' });
   const [preview, setPreview] = useState(null);
+
+  useEffect(() => () => preview && URL.revokeObjectURL(preview), [preview]);
+
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && !uploading && onClose();
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [uploading, onClose]);
 
   function handleFileChange(e) {
     const f = e.target.files[0];
@@ -61,7 +80,8 @@ function LessonForm({ courseId, lesson, onClose }) {
         setUploading(true);
         setProgress(0);
 
-        const path = `lessons/${Date.now()}_${file.name}`;
+        const safeName = file.name.replace(/[^\w.-]+/g, '_');
+        const path = `lessons/${Date.now()}_${safeName}`;
 
         try {
           const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -80,9 +100,7 @@ function LessonForm({ courseId, lesson, onClose }) {
             xhr.setRequestHeader('x-upsert', 'false');
 
             xhr.upload.onprogress = (ev) => {
-              if (ev.lengthComputable) {
-                setProgress(Math.round((ev.loaded / ev.total) * 100));
-              }
+              if (ev.lengthComputable) setProgress(Math.round((ev.loaded / ev.total) * 100));
             };
 
             xhr.onload = () => {
@@ -114,6 +132,10 @@ function LessonForm({ courseId, lesson, onClose }) {
         setMsg({ text: '❌ الصق رابط الفيديو', type: 'error' });
         return;
       }
+      if (videoType === 'drive' && !isDriveUrl(finalUrl)) {
+        setMsg({ text: '❌ ده مش رابط درايف صحيح. انسخ رابط المشاركة (Share → Copy link)', type: 'error' });
+        return;
+      }
     }
 
     const payload = {
@@ -142,31 +164,21 @@ function LessonForm({ courseId, lesson, onClose }) {
   }
 
   return (
-    <div className="overlay open" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <button className="close" onClick={onClose}>✕</button>
+    <div className="overlay open">
+      <div className="modal" role="dialog" aria-modal="true">
+        <button className="close" onClick={onClose} type="button" disabled={uploading} aria-label="إغلاق">✕</button>
 
         <h3>{editing ? 'تعديل الفيديو' : 'إضافة فيديو جديد'}</h3>
 
         <form onSubmit={handleSubmit}>
           <div className="field">
             <label>عنوان الفيديو</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="مثال: الشرح - الدرس الأول"
-              required
-            />
+            <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="مثال: الشرح - الدرس الأول" required />
           </div>
 
           <div className="field">
             <label>وصف مختصر (اختياري)</label>
-            <textarea
-              rows="2"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
+            <textarea rows="2" value={description} onChange={(e) => setDescription(e.target.value)} />
           </div>
 
           <div className="field">
@@ -175,6 +187,7 @@ function LessonForm({ courseId, lesson, onClose }) {
               <option value="youtube">▶️ يوتيوب (الأسرع والأفضل)</option>
               <option value="vimeo">🎥 فيميو</option>
               <option value="drive">📁 جوجل درايف</option>
+              <option value="link">🔗 رابط مباشر (MP4)</option>
               <option value="file">📱 رفع ملف (50 MB كحد أقصى)</option>
             </select>
           </div>
@@ -182,16 +195,10 @@ function LessonForm({ courseId, lesson, onClose }) {
           {videoType !== 'file' && (
             <div className="field">
               <label>رابط الفيديو</label>
-              <input
-                type="url"
-                value={videoUrl}
-                onChange={(e) => setVideoUrl(e.target.value)}
-                placeholder={
-                  videoType === 'youtube' ? 'https://youtu.be/...' :
-                  videoType === 'vimeo' ? 'https://vimeo.com/...' :
-                  'https://drive.google.com/file/d/.../view'
-                }
-              />
+              <input type="url" dir="ltr" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder={PLACEHOLDER[videoType]} />
+              {videoType === 'drive' && (
+                <small className="hint">📁 Share ← General access ← Anyone with the link (Viewer)، وإلا الطالب مش هيشوفه.</small>
+              )}
             </div>
           )}
 
@@ -199,51 +206,40 @@ function LessonForm({ courseId, lesson, onClose }) {
             <div className="field">
               <label>اختر ملف الفيديو</label>
               <input type="file" accept="video/*" onChange={handleFileChange} />
-              <small style={{ display: 'block', marginTop: 6, color: 'var(--danger)' }}>
-                ⚠️ الحد الأقصى: 50 MB. للفيديوهات الأكبر، استخدم YouTube أو Drive.
-              </small>
-              {preview && (
-                <video src={preview} controls style={{ marginTop: 10, maxWidth: '100%', maxHeight: 180, borderRadius: 8 }} />
-              )}
+              <small className="hint warn">⚠️ الحد الأقصى 50 MB. للفيديوهات الأكبر استخدم YouTube أو Drive.</small>
+              {preview && <video src={preview} controls className="form-video-preview" />}
               {file && (
-                <small style={{ display: 'block', marginTop: 6, color: 'var(--ink-soft)' }}>
-                  📹 {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)
-                </small>
+                <small className="hint">📹 {file.name} ({(file.size / 1024 / 1024).toFixed(1)} MB)</small>
               )}
             </div>
           )}
 
           {uploading && (
-            <div style={{ marginTop: 12 }}>
-              <div style={{ width: '100%', height: 12, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden' }}>
-                <div style={{ width: `${progress}%`, height: '100%', background: 'linear-gradient(90deg, var(--gold), var(--teal))', transition: 'width 0.3s ease' }} />
-              </div>
-              <p style={{ textAlign: 'center', marginTop: 8, fontSize: 13, fontWeight: 700 }}>
-                {progress}% — جاري الرفع...
-              </p>
+            <div className="up-wrap">
+              <div className="up-bar"><div className="up-fill" style={{ width: `${progress}%` }} /></div>
+              <p>{progress}% — جاري الرفع...</p>
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 10 }}>
-            <div className="field" style={{ flex: 1 }}>
+          <div className="field-row">
+            <div className="field">
               <label>المدة (دقيقة)</label>
               <input type="number" value={duration} onChange={(e) => setDuration(e.target.value)} min="0" />
             </div>
-            <div className="field" style={{ flex: 1 }}>
+            <div className="field">
               <label>الترتيب</label>
               <input type="number" value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} />
             </div>
           </div>
 
-          {msg.text && (
-            <div className={`form-msg ${msg.type}`} style={{ display: 'block' }}>
-              {msg.text}
-            </div>
-          )}
+          {msg.text && <div className={`form-msg ${msg.type}`}>{msg.text}</div>}
 
-          <button className="btn btn-gold btn-block" type="submit" disabled={uploading} style={{ marginTop: 10 }}>
-            {uploading ? `⏳ جاري الرفع... (${progress}%)` : '💾 حفظ'}
-          </button>
+          <div className="modal-actions">
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={uploading}>إلغاء</button>
+            <button className="btn btn-gold" type="submit" disabled={uploading}>
+              {uploading ? `⏳ ${progress}%` : '💾 حفظ'}
+            </button>
+          </div>
         </form>
       </div>
     </div>

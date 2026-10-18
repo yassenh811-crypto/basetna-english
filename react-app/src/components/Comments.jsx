@@ -5,16 +5,16 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 
+const MAX_LEN = 500;
+const ROLE_EMOJI = { superadmin: '👑', owner: '👩‍🏫', support: '🛠️' };
+
 function Comments({ lessonId }) {
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const [comments, setComments] = useState([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
 
-  /* ============================================================
-     جلب التعليقات
-     ============================================================ */
   async function loadComments() {
     setLoading(true);
     const { data, error } = await supabase
@@ -22,7 +22,6 @@ function Comments({ lessonId }) {
       .select('*, profiles(full_name, role)')
       .eq('lesson_id', lessonId)
       .order('created_at', { ascending: true });
-
     if (error) console.error(error);
     setComments(data || []);
     setLoading(false);
@@ -32,9 +31,6 @@ function Comments({ lessonId }) {
     if (lessonId) loadComments();
   }, [lessonId]);
 
-  /* ============================================================
-     إرسال تعليق
-     ============================================================ */
   async function handleSend() {
     if (!input.trim() || sending || !user) return;
     setSending(true);
@@ -42,23 +38,18 @@ function Comments({ lessonId }) {
     const { error } = await supabase.from('comments').insert({
       lesson_id: lessonId,
       student_id: user.id,
-      content: input.trim(),
+      content: input.trim().slice(0, MAX_LEN),
     });
 
     setSending(false);
-
     if (error) {
       alert('❌ ' + error.message);
       return;
     }
-
     setInput('');
     await loadComments();
   }
 
-  /* ============================================================
-     حذف تعليق
-     ============================================================ */
   async function handleDelete(id) {
     if (!confirm('متأكد إنك عايز تحذف التعليق؟')) return;
     const { error } = await supabase.from('comments').delete().eq('id', id);
@@ -66,59 +57,37 @@ function Comments({ lessonId }) {
       alert('❌ ' + error.message);
       return;
     }
-    await loadComments();
+    setComments((list) => list.filter((c) => c.id !== id));
   }
 
-  /* ============================================================
-     Enter للإرسال
-     ============================================================ */
   function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       handleSend();
     }
   }
 
-  /* ============================================================
-     Render
-     ============================================================ */
   return (
-    <div style={{ padding: '16px 20px', borderTop: '1px solid var(--line)' }}>
-      <h3 style={{ marginBottom: 12, color: 'var(--navy-deep)', fontSize: 16 }}>
-        💬 التعليقات ({comments.length})
-      </h3>
+    <section className="cm">
+      <h3>💬 التعليقات <span className="count-chip">{comments.length}</span></h3>
 
-      {/* قايمة التعليقات */}
       {loading ? (
-        <div className="empty-state">جاري التحميل...</div>
+        <div className="skeleton-list" style={{ padding: 0 }}><span /><span /></div>
       ) : comments.length === 0 ? (
         <div className="empty-state">لسه مفيش تعليقات 👋 كن أول واحد</div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16, maxHeight: 300, overflowY: 'auto' }}>
+        <div className="cm-list">
           {comments.map((c) => {
             const isMine = c.student_id === user?.id;
-            const roleEmoji =
-              c.profiles?.role === 'superadmin' ? '👑' :
-              c.profiles?.role === 'owner' ? '👩‍🏫' :
-              c.profiles?.role === 'support' ? '🛠️' : '🎓';
-
+            const role = c.profiles?.role;
+            const staff = !!ROLE_EMOJI[role];
             return (
-              <div
-                key={c.id}
-                style={{
-                  padding: 12,
-                  background: 'var(--paper)',
-                  borderRadius: 10,
-                  border: '1px solid var(--line)',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 18 }}>{roleEmoji}</span>
-                    <b style={{ color: 'var(--navy-deep)', fontSize: 14 }}>
-                      {c.profiles?.full_name || 'طالب'}
-                    </b>
-                    <small style={{ color: 'var(--ink-soft)', fontSize: 11 }}>
+              <div className="cm-item" key={c.id}>
+                <div className="cm-ava">{ROLE_EMOJI[role] || '🎓'}</div>
+                <div className={`cm-bubble${staff ? ' staff' : ''}`}>
+                  <div className="cm-head">
+                    <b>{c.profiles?.full_name || 'طالب'}</b>
+                    <small>
                       {new Date(c.created_at).toLocaleString('ar-EG', {
                         day: '2-digit',
                         month: '2-digit',
@@ -126,19 +95,13 @@ function Comments({ lessonId }) {
                         minute: '2-digit',
                       })}
                     </small>
+                    {isMine && (
+                      <button type="button" className="icon-btn danger cm-del" onClick={() => handleDelete(c.id)} aria-label="حذف التعليق">
+                        🗑️
+                      </button>
+                    )}
                   </div>
-                  {isMine && (
-                    <button
-                      className="icon-btn danger"
-                      onClick={() => handleDelete(c.id)}
-                      style={{ padding: '4px 8px', fontSize: 11 }}
-                    >
-                      🗑️
-                    </button>
-                  )}
-                </div>
-                <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--ink)', whiteSpace: 'pre-wrap' }}>
-                  {c.content}
+                  <div className="cm-text" dir="auto">{c.content}</div>
                 </div>
               </div>
             );
@@ -146,40 +109,25 @@ function Comments({ lessonId }) {
         </div>
       )}
 
-      {/* إضافة تعليق */}
       {user ? (
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div className="cm-form">
           <input
             type="text"
             placeholder="اكتب تعليق..."
             value={input}
+            maxLength={MAX_LEN}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={sending}
-            style={{
-              flex: 1,
-              padding: '10px 14px',
-              border: '1.5px solid var(--line)',
-              borderRadius: 999,
-              fontSize: 14,
-              fontFamily: 'inherit',
-              background: '#fff',
-            }}
           />
-          <button
-            className="btn btn-teal btn-sm"
-            onClick={handleSend}
-            disabled={sending || !input.trim()}
-          >
+          <button type="button" className="btn btn-teal btn-sm" onClick={handleSend} disabled={sending || !input.trim()}>
             {sending ? '...' : 'إرسال'}
           </button>
         </div>
       ) : (
-        <div className="empty-state" style={{ padding: 12 }}>
-          سجّل دخولك عشان تعلّق
-        </div>
+        <div className="empty-state compact">سجّل دخولك عشان تعلّق</div>
       )}
-    </div>
+    </section>
   );
 }
 

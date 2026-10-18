@@ -1,0 +1,116 @@
+/* ============================================================
+   🌙 theme-dark.css — الوضع الليلي + زرار التبديل
+   لازم يتحمّل آخر ملف CSS في main.jsx.
+   بيستخدم html[data-theme="dark"] عشان يكسب على :root بتاع legacy.css.
+   ============================================================ */
+
+/* ---------- المتغيرات (الأساس: كل الملفات بقت بتقرا منها) ---------- */
+html[data-theme='dark'] {
+  color-scheme: dark;
+  --paper: #0A1424;
+  --paper-2: #101E33;
+  --surface: #12233B;
+  --hover-wash: #162B47;
+  --line: #25405F;
+  --ink: #E8EEF7;
+  --ink-soft: #9DB0C8;
+  --heading: #F1F5FB;
+
+  --navy-mid: #16315A;
+  --navy: #0E2142;
+  --navy-deep: #07111F;
+
+  --gold: #D4A84B;
+  --gold-soft: #EBD29A;
+  --teal: #2F9C86;
+  --teal-dark: #1F7767;
+  --danger: #FF8A70;
+
+  --gold-wash: #3A2E10;
+  --teal-wash: #123A31;
+  --danger-wash: #43211A;
+  --purple-wash: #2B1A45;
+  --ai-wash: #161B3A;
+
+  --sh-1: 0 1px 2px rgba(0,0,0,.4), 0 4px 14px rgba(0,0,0,.3);
+  --sh-2: 0 2px 4px rgba(0,0,0,.4), 0 14px 32px rgba(0,0,0,.45);
+  --sh-3: 0 8px 16px rgba(0,0,0,.45), 0 32px 64px rgba(0,0,0,.6);
+  --shadow-sm: var(--sh-1);
+  --shadow: var(--sh-2);
+  --shadow-lg: var(--sh-3);
+}
+
+/* ---------- تصحيحات دقيقة (ألوان نص فوق خلفيات ملوّنة) ---------- */
+html[data-theme='dark'] .brand .mark,
+html[data-theme='dark'] .avatar-dot { color: #0B1D38; }
+
+html[data-theme='dark'] .badge.active,
+html[data-theme='dark'] .link-chip,
+html[data-theme='dark'] .pp-top b { color: #7FE0B0; }
+
+html[data-theme='dark'] .private-chat-banner,
+html[data-theme='dark'] .private-chat-banner button,
+html[data-theme='dark'] .group-member-chip:hover { color: #E3C8FF; }
+html[data-theme='dark'] .info-box.warn,
+html[data-theme='dark'] .notice-card.warn { color: #EBD29A; border-color: #6b5210; }
+
+html[data-theme='dark'] input,
+html[data-theme='dark'] select,
+html[data-theme='dark'] textarea { color: var(--ink); }
+html[data-theme='dark'] ::placeholder { color: #7C91AC; opacity: 1; }
+
+html[data-theme='dark'] .rating-stars .star { color: #3A5070; }
+html[data-theme='dark'] .rating-stars .star:hover,
+html[data-theme='dark'] .rating-stars .star.active { color: var(--gold); }
+
+html[data-theme='dark'] .img-up-actions .icon-btn { color: #12263A; }
+
+/* كارت قاعدة النهاردة بيفضل ورقة فاتحة (مقصود) */
+html[data-theme='dark'] .bt-note-label,
+html[data-theme='dark'] .bt-hint { color: #52626F; }
+
+/* المساعد الذكي */
+html[data-theme='dark'] .bai-msg.err { color: #FFB3A3; border-color: #6B3126; }
+html[data-theme='dark'] .bai-msg code,
+html[data-theme='dark'] .bai-msg pre { background: rgba(255,255,255,.08); }
+html[data-theme='dark'] .bai-quick button { color: var(--ink); }
+html[data-theme='dark'] .bai-quick button:hover { color: #fff; }
+
+/* صور هادية بالليل + سكرول + تحديد */
+html[data-theme='dark'] .course-thumb img,
+html[data-theme='dark'] .mini-cover img,
+html[data-theme='dark'] .lm-thumb img,
+html[data-theme='dark'] .lesson-thumb img { filter: brightness(.9) contrast(1.05); }
+html[data-theme='dark'] *::-webkit-scrollbar-thumb { background: #34557D; background-clip: content-box; }
+html[data-theme='dark'] ::selection { background: rgba(212,168,75,.45); color: #fff; }
+
+/* ---------- زرار التبديل (ThemeToggle.jsx) ---------- */
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
+  background: rgba(255,255,255,.08); color: #E6ECF5;
+  border: 1px solid rgba(235,210,154,.28); border-radius: 999px;
+  padding: 5px 14px 5px 6px; font: 700 13.5px var(--font, 'Cairo', sans-serif);
+  transition: background .2s ease, border-color .2s ease;
+}
+html[dir='rtl'] .theme-toggle { padding: 5px 6px 5px 14px; }
+.theme-toggle:hover { background: rgba(235,210,154,.16); border-color: var(--gold, #C79A3D); }
+.tt-track {
+  position: relative; width: 54px; height: 28px; border-radius: 999px; flex-shrink: 0;
+  background: linear-gradient(135deg, #F6D98B, #E0A93C); transition: background .3s ease;
+}
+.theme-toggle.is-dark .tt-track { background: linear-gradient(135deg, #2B3F7A, #141F45); }
+.tt-icon { position: absolute; top: 50%; transform: translateY(-50%); font-size: 13px; line-height: 1; }
+.tt-sun { inset-inline-end: 7px; }
+.tt-moon { inset-inline-start: 7px; }
+.tt-thumb {
+  position: absolute; top: 3px; inset-inline-start: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,.35);
+  transition: inset-inline-start .3s cubic-bezier(.22,1,.36,1);
+}
+.theme-toggle.is-dark .tt-thumb { inset-inline-start: calc(100% - 25px); }
+.side-tools .theme-toggle { width: 100%; justify-content: flex-start; border-radius: 12px; padding: 8px 12px; }
+
+/* تبديل ناعم (UIContext بيضيف الكلاس لحظياً) */
+html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
+  transition: background-color .3s ease, color .25s ease, border-color .3s ease, box-shadow .3s ease !important;
+}

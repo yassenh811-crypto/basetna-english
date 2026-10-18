@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { UIProvider } from './context/UIContext';
 import { ChatProvider } from './context/ChatContext';
 import { AIChatProvider } from './context/AIChatContext';
+import { ActingAsProvider } from './context/ActingAsContext';
 import { useRole } from './hooks/useRole';
 
 import Navbar from './components/Navbar';
@@ -16,6 +17,7 @@ import SupportFabs from './components/SupportFabs';
 import WelcomeModal from './components/WelcomeModal';
 import AuthModal from './components/AuthModal';
 import SupportModal from './components/SupportModal';
+import RoleSwitchModal from './components/RoleSwitchModal';
 import AIChat from './components/AIChat';
 
 import Home from './pages/Home';
@@ -86,6 +88,7 @@ function AppContent() {
       <WelcomeModal />
       <AuthModal />
       <SupportModal />
+      <RoleSwitchModal />
     </>
   );
 }
@@ -94,11 +97,13 @@ function App() {
   return (
     <UIProvider>
       <AuthProvider>
-        <ChatProvider>
-          <AIChatProvider>
-            <AppContent />
-          </AIChatProvider>
-        </ChatProvider>
+        <ActingAsProvider>
+          <ChatProvider>
+            <AIChatProvider>
+              <AppContent />
+            </AIChatProvider>
+          </ChatProvider>
+        </ActingAsProvider>
       </AuthProvider>
     </UIProvider>
   );

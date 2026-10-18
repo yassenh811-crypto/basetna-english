@@ -2,13 +2,80 @@
 <html lang="ar" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet">
-    <title>بسّطنا الإنجليزي | Basetna English</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>بسّطنا الإنجليزي — مس. شيرهان علي</title>
+    <meta name="description" content="منصة بسّطنا الإنجليزي: كورسات إنجليزي مرتبة حسب مرحلتك الدراسية، فيديوهات لكل كورس، ومتابعة مباشرة مع مس. شيرهان علي." />
+    <meta name="theme-color" content="#0B1D38" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="بسّطنا الإنجليزي" />
+    <meta property="og:description" content="الإنجليزي يبقى سهل وبسيط مع مس. شيرهان." />
+    <meta property="og:locale" content="ar_EG" />
+
+    <!-- أيقونة الموقع (جوجل بيحتاج ملف حقيقي على رابط ثابت، مش data:) -->
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" sizes="any" />
+    <link rel="icon" href="/favicon-96x96.png" type="image/png" sizes="96x96" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" sizes="180x180" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <link rel="canonical" href="https://www.basetna-english.online/" />
+    <meta name="application-name" content="بسّطنا الإنجليزي" />
+    <meta name="apple-mobile-web-app-title" content="بسّطنا" />
+
+    <!-- بيساعد جوجل يعرف اسم الموقع واللوجو -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "name": "بسّطنا الإنجليزي",
+            "alternateName": ["Basetna English", "بسطنا الإنجليزي"],
+            "url": "https://www.basetna-english.online/",
+            "inLanguage": "ar"
+          },
+          {
+            "@type": "EducationalOrganization",
+            "name": "بسّطنا الإنجليزي",
+            "url": "https://www.basetna-english.online/",
+            "logo": "https://www.basetna-english.online/android-chrome-512x512.png"
+          }
+        ]
+      }
+    </script>
+
+    <!-- الخطوط: Cairo للنص و El Messiri للعناوين والأرقام -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=El+Messiri:wght@600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- يمنع وميض الأبيض: بيطبّق الثيم واللغة قبل ما الصفحة تترسم -->
+    <script>
+      try {
+        var t = localStorage.getItem('basetna_theme') ||
+          (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        var l = localStorage.getItem('basetna_lang') || 'ar';
+        var r = document.documentElement;
+        r.setAttribute('data-theme', t);
+        r.lang = l;
+        r.dir = l === 'ar' ? 'rtl' : 'ltr';
+        var m = document.querySelector('meta[name="theme-color"]');
+        if (m) m.setAttribute('content', t === 'dark' ? '#0A1424' : '#0B1D38');
+      } catch (e) {}
+    </script>
+    <style>
+      html { background: #FAF6EE; }
+      html[data-theme='dark'] { background: #0A1424; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
+    <noscript>لازم تفعّل JavaScript عشان الموقع يشتغل. / Please enable JavaScript to use this site.</noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

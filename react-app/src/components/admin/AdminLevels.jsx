@@ -4,6 +4,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabase';
 import AdminFormModal from './AdminFormModal';
+import { AdminToolbar, StateRow, RowActions } from './AdminUI';
+
+const EMPTY = { name_ar: '', name_en: '', sort_order: 0 };
 
 function AdminLevels() {
   const [levels, setLevels] = useState([]);
@@ -12,20 +15,12 @@ function AdminLevels() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [search, setSearch] = useState('');
-
-  const [form, setForm] = useState({
-    name_ar: '',
-    name_en: '',
-    sort_order: 0,
-  });
+  const [form, setForm] = useState(EMPTY);
   const [msg, setMsg] = useState('');
 
   async function loadLevels() {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('grade_levels')
-      .select('*')
-      .order('sort_order');
+    const { data, error } = await supabase.from('grade_levels').select('*').order('sort_order');
     if (error) console.error(error);
     setLevels(data || []);
     setLoading(false);
@@ -37,7 +32,7 @@ function AdminLevels() {
 
   function openAddModal() {
     setEditing(null);
-    setForm({ name_ar: '', name_en: '', sort_order: 0 });
+    setForm({ ...EMPTY, sort_order: levels.length + 1 });
     setMsg('');
     setModalOpen(true);
   }
@@ -72,10 +67,7 @@ function AdminLevels() {
 
     let error;
     if (editing) {
-      ({ error } = await supabase
-        .from('grade_levels')
-        .update(payload)
-        .eq('id', editing.id));
+      ({ error } = await supabase.from('grade_levels').update(payload).eq('id', editing.id));
     } else {
       ({ error } = await supabase.from('grade_levels').insert(payload));
     }
@@ -91,51 +83,34 @@ function AdminLevels() {
     await loadLevels();
   }
 
-  async function handleDelete(id) {
-    if (!confirm('متأكد إنك عايز تحذف المرحلة دي؟')) return;
-    const { error } = await supabase
-      .from('grade_levels')
-      .delete()
-      .eq('id', id);
+  async function handleDelete(lv) {
+    if (!confirm(`متأكد إنك عايز تحذف مرحلة "${lv.name_ar}"؟`)) return;
+    const { error } = await supabase.from('grade_levels').delete().eq('id', lv.id);
     if (error) {
-      alert('❌ ' + error.message);
+      alert('❌ ' + error.message + '\n\n(غالباً فيه كورسات أو باقات أو طلاب مرتبطين بالمرحلة دي)');
       return;
     }
     await loadLevels();
   }
 
-  const filteredLevels = levels.filter(
-    (lv) =>
-      (lv.name_ar || '').toLowerCase().includes(search.toLowerCase()) ||
-      (lv.name_en || '').toLowerCase().includes(search.toLowerCase())
+  const q = search.toLowerCase();
+  const filtered = levels.filter(
+    (lv) => (lv.name_ar || '').toLowerCase().includes(q) || (lv.name_en || '').toLowerCase().includes(q)
   );
 
   return (
     <>
-      <div className="dash-head" style={{ flexWrap: 'wrap', gap: 10 }}>
-        <h1>المراحل الدراسية</h1>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            placeholder="🔍 ابحث في المراحل..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              padding: '10px 16px',
-              border: '1.5px solid var(--line)',
-              borderRadius: 999,
-              fontSize: 14,
-              minWidth: 220,
-              background: '#fff',
-            }}
-          />
-          <button className="btn btn-gold btn-sm" onClick={openAddModal}>
-            + إضافة مرحلة
-          </button>
-        </div>
-      </div>
+      <AdminToolbar
+        title="المراحل الدراسية"
+        count={levels.length}
+        search={search}
+        onSearch={setSearch}
+        placeholder="ابحث في المراحل..."
+        addLabel="إضافة مرحلة"
+        onAdd={openAddModal}
+      />
 
-      <div className="table-wrap">
+      <div className="table-wrap stack">
         <table>
           <thead>
             <tr>
@@ -146,43 +121,22 @@ function AdminLevels() {
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="4">
-                  <div className="empty-state">جاري التحميل...</div>
-                </td>
-              </tr>
-            ) : filteredLevels.length === 0 ? (
-              <tr>
-                <td colSpan="4">
-                  <div className="empty-state">
-                    {search ? 'مفيش نتايج' : 'لسه مفيش مراحل'}
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              filteredLevels.map((lv) => (
+            <StateRow colSpan={4} loading={loading} />
+            <StateRow colSpan={4} empty={!loading && filtered.length === 0} text={search ? 'مفيش نتايج' : 'لسه مفيش مراحل'} />
+            {!loading &&
+              filtered.map((lv) => (
                 <tr key={lv.id}>
-                  <td>{lv.name_ar}</td>
-                  <td>{lv.name_en}</td>
-                  <td>{lv.sort_order}</td>
-                  <td>
-                    <button
-                      className="icon-btn"
-                      onClick={() => openEditModal(lv)}
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      className="icon-btn danger"
-                      onClick={() => handleDelete(lv.id)}
-                    >
-                      🗑️
-                    </button>
+                  <td data-label="الاسم (عربي)"><b>{lv.name_ar}</b></td>
+                  <td data-label="English" dir="ltr">{lv.name_en}</td>
+                  <td data-label="الترتيب"><span className="level-chip">{lv.sort_order}</span></td>
+                  <td data-label="إجراءات">
+                    <RowActions>
+                      <button className="icon-btn" onClick={() => openEditModal(lv)} aria-label="تعديل">✏️ <span className="only-mobile">تعديل</span></button>
+                      <button className="icon-btn danger" onClick={() => handleDelete(lv)} aria-label="حذف">🗑️ <span className="only-mobile">حذف</span></button>
+                    </RowActions>
                   </td>
                 </tr>
-              ))
-            )}
+              ))}
           </tbody>
         </table>
       </div>
@@ -196,29 +150,15 @@ function AdminLevels() {
       >
         <div className="field">
           <label>الاسم (عربي)</label>
-          <input
-            type="text"
-            value={form.name_ar}
-            onChange={(e) => setForm({ ...form, name_ar: e.target.value })}
-            required
-          />
+          <input type="text" value={form.name_ar} onChange={(e) => setForm({ ...form, name_ar: e.target.value })} required />
         </div>
         <div className="field">
           <label>Name (English)</label>
-          <input
-            type="text"
-            value={form.name_en}
-            onChange={(e) => setForm({ ...form, name_en: e.target.value })}
-            required
-          />
+          <input type="text" dir="ltr" value={form.name_en} onChange={(e) => setForm({ ...form, name_en: e.target.value })} required />
         </div>
         <div className="field">
           <label>الترتيب</label>
-          <input
-            type="number"
-            value={form.sort_order}
-            onChange={(e) => setForm({ ...form, sort_order: e.target.value })}
-          />
+          <input type="number" value={form.sort_order} onChange={(e) => setForm({ ...form, sort_order: e.target.value })} />
         </div>
         {msg && <div className="form-msg error">{msg}</div>}
       </AdminFormModal>

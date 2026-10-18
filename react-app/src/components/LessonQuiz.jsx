@@ -1,9 +1,28 @@
 /* ============================================================
-   🎓 LessonQuiz — امتحان مع تايمر + مرة واحدة + 15 سؤال
+   🎓 LessonQuiz — امتحان مع تايمر + عدد محاولات + استكمال لو خرج
+   ------------------------------------------------------------
+   إصلاحات:
+   - لما الوقت يخلص كان بيتسلّم بإجابات فاضية (stale closure) → اتصلّح
+   - لو الطالب قفل الصفحة، الوقت فعلاً مش بيقف (بنحفظ وقت البداية)
+   - عدد المحاولات بيتحسب صح (max_attempts)
    ============================================================ */
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
+
+const LETTERS = ['أ', 'ب', 'ج', 'د', 'هـ', 'و'];
+
+function Shell({ children, onOverlay }) {
+  return (
+    <div className="overlay open" onClick={onOverlay}>
+      <div className="modal qz-modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const faceFor = (pct) => (pct >= 80 ? '🏆' : pct >= 50 ? '👍' : '💪');
 
 function LessonQuiz({ lesson, onClose }) {
   const { user } = useAuth();
@@ -14,12 +33,30 @@ function LessonQuiz({ lesson, onClose }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [previousAttempt, setPreviousAttempt] = useState(null);
+  const [attempts, setAttempts] = useState([]);
   const [timeLeft, setTimeLeft] = useState(0);
   const [startedAt, setStartedAt] = useState(null);
+
+  /* refs عشان الـ timer مياخدش قيم قديمة */
+  const answersRef = useRef({});
+  const quizRef = useRef(null);
+  const userRef = useRef(null);
+  const startedRef = useRef(null);
+  const submittedRef = useRef(false);
   const timerRef = useRef(null);
 
-  /* جلب الامتحان + المحاولات */
+  userRef.current = user;
+  quizRef.current = quiz;
+  startedRef.current = startedAt;
+
+  const maxAttempts = quiz?.max_attempts || 1;
+  const blocked = !!quiz && attempts.length >= maxAttempts;
+  const last = attempts[0];
+  const inProgress = startedAt !== null && !submitted;
+
+  const storeKey = (q = quizRef.current) => (q && userRef.current ? `quiz_${q.id}_${userRef.current.id}` : null);
+
+  /* ---------- تحميل ---------- */
   useEffect(() => {
     async function load() {
       setLoading(true);
@@ -30,20 +67,32 @@ function LessonQuiz({ lesson, onClose }) {
           .select('*')
           .eq('lesson_id', lesson.id)
           .maybeSingle();
-
         if (quizErr) throw quizErr;
         setQuiz(quizData);
+        quizRef.current = quizData;
 
+        let list = [];
         if (quizData && user) {
-          const { data: attempts } = await supabase
+          const { data } = await supabase
             .from('quiz_attempts')
             .select('*')
             .eq('quiz_id', quizData.id)
             .eq('student_id', user.id)
-            .order('created_at', { ascending: false })
-            .limit(1);
+            .order('created_at', { ascending: false });
+          list = data || [];
+          setAttempts(list);
 
-          if (attempts && attempts.length > 0) setPreviousAttempt(attempts[0]);
+          /* استكمال امتحان كان شغال */
+          if (list.length < (quizData.max_attempts || 1)) {
+            try {
+              const saved = JSON.parse(localStorage.getItem(`quiz_${quizData.id}_${user.id}`) || 'null');
+              if (saved?.startedAt) {
+                answersRef.current = saved.answers || {};
+                setAnswers(saved.answers || {});
+                setStartedAt(saved.startedAt);
+              }
+            } catch {}
+          }
         }
       } catch (err) {
         console.error('❌', err);
@@ -55,208 +104,223 @@ function LessonQuiz({ lesson, onClose }) {
     load();
   }, [lesson.id, user]);
 
-  /* التايمر */
-  useEffect(() => {
-    if (!quiz || submitted || previousAttempt) return;
-    if (startedAt === null) return;
-    if (timerRef.current) clearInterval(timerRef.current);
+  /* ---------- التسليم ---------- */
+  async function submit() {
+    if (submittedRef.current) return;
+    const q = quizRef.current;
+    if (!q) return;
+    submittedRef.current = true;
+    clearInterval(timerRef.current);
 
-    timerRef.current = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-      const total = (quiz.time_limit_min || 10) * 60;
-      const left = total - elapsed;
-      setTimeLeft(left);
-      if (left <= 0) {
-        clearInterval(timerRef.current);
-        handleSubmit(true);
-      }
-    }, 1000);
-
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, [quiz, startedAt, submitted, previousAttempt]);
-
-  function startQuiz() {
-    setStartedAt(Date.now());
-    setTimeLeft((quiz.time_limit_min || 10) * 60);
-  }
-
-  async function handleSubmit(timeUp = false) {
-    if (!quiz) return;
-    if (timerRef.current) clearInterval(timerRef.current);
-
+    const ans = answersRef.current;
     let correct = 0;
-    quiz.questions.forEach((q, i) => {
-      if (answers[i] === q.correct) correct++;
+    q.questions.forEach((qq, i) => {
+      if (ans[i] === qq.correct) correct++;
     });
-
     setScore(correct);
     setSubmitted(true);
 
-    if (user) {
+    const u = userRef.current;
+    try { const k = storeKey(q); if (k) localStorage.removeItem(k); } catch {}
+
+    if (u) {
       setSaving(true);
       try {
-        const duration = startedAt ? Math.floor((Date.now() - startedAt) / 1000) : 0;
-        await supabase.from('quiz_attempts').insert({
-          quiz_id: quiz.id,
-          student_id: user.id,
+        const duration = startedRef.current ? Math.floor((Date.now() - startedRef.current) / 1000) : 0;
+        const { error: insErr } = await supabase.from('quiz_attempts').insert({
+          quiz_id: q.id,
+          student_id: u.id,
           score: correct,
-          total: quiz.questions.length,
+          total: q.questions.length,
           duration_sec: duration,
         });
-        await supabase.rpc('add_points', {
-          student_uuid: user.id,
-          amount: correct * 10,
-        });
-      } catch (err) { console.error('❌', err); }
-      finally { setSaving(false); }
+        if (insErr) throw insErr;
+        await supabase.rpc('add_points', { student_uuid: u.id, amount: correct * 10 });
+      } catch (err) {
+        console.error('❌', err);
+        setError('الامتحان اتسلّم، لكن حصلت مشكلة في حفظ النتيجة. صوّر الشاشة وابعتها للميس.');
+      } finally {
+        setSaving(false);
+      }
     }
   }
 
+  /* ---------- التايمر ---------- */
+  useEffect(() => {
+    if (!quiz || startedAt === null || submitted || blocked) return;
+    const total = (quiz.time_limit_min || 10) * 60;
+    const tick = () => {
+      const left = total - Math.floor((Date.now() - startedAt) / 1000);
+      setTimeLeft(left);
+      if (left <= 0) submit();
+    };
+    tick();
+    timerRef.current = setInterval(tick, 1000);
+    return () => clearInterval(timerRef.current);
+  }, [quiz, startedAt, submitted, blocked]);
+
+  function startQuiz() {
+    const now = Date.now();
+    setStartedAt(now);
+    try {
+      const k = storeKey();
+      if (k) localStorage.setItem(k, JSON.stringify({ startedAt: now, answers: {} }));
+    } catch {}
+  }
+
+  function pick(i, idx) {
+    if (submitted) return;
+    const next = { ...answersRef.current, [i]: idx };
+    answersRef.current = next;
+    setAnswers(next);
+    try {
+      const k = storeKey();
+      if (k) localStorage.setItem(k, JSON.stringify({ startedAt: startedRef.current, answers: next }));
+    } catch {}
+  }
+
+  function handleManualSubmit() {
+    const total = quiz.questions.length;
+    const answered = Object.keys(answersRef.current).length;
+    if (answered < total && !confirm(`فيه ${total - answered} سؤال من غير إجابة. عايز تسلّم؟`)) return;
+    submit();
+  }
+
+  function handleClose() {
+    if (inProgress && !confirm('لو خرجت، الوقت هيفضل شغال. متأكد؟')) return;
+    onClose();
+  }
+
+  const CloseBtn = (
+    <button className="close" type="button" onClick={handleClose} aria-label="إغلاق">✕</button>
+  );
+
+  /* ---------- الحالات ---------- */
   if (loading) {
     return (
-      <div className="overlay open" onClick={onClose}>
-        <div className="modal" onClick={(e) => e.stopPropagation()}>
-          <div className="empty-state">جاري التحميل...</div>
-        </div>
-      </div>
+      <Shell onOverlay={onClose}>
+        <div className="skeleton-list"><span /><span /><span /></div>
+      </Shell>
     );
   }
 
   if (!quiz) {
     return (
-      <div className="overlay open" onClick={onClose}>
-        <div className="modal" onClick={(e) => e.stopPropagation()}>
-          <button className="close" onClick={onClose}>✕</button>
-          <h3>🎓 امتحان الدرس</h3>
-          <div className="empty-state" style={{ padding: 30 }}>
-            <div style={{ fontSize: 48, marginBottom: 10 }}>📚</div>
-            لسه مفيش امتحان للدرس ده.
-          </div>
+      <Shell onOverlay={onClose}>
+        {CloseBtn}
+        <h3>🎓 امتحان الدرس</h3>
+        <div className="empty-state">
+          <div style={{ fontSize: 44, marginBottom: 8 }}>📚</div>
+          لسه مفيش امتحان للدرس ده.
         </div>
-      </div>
+        {error && <div className="form-msg error">{error}</div>}
+      </Shell>
     );
   }
 
-  /* محاولة سابقة + مرة واحدة */
-  if (previousAttempt && (quiz.max_attempts || 1) === 1) {
-    const pct = Math.round((previousAttempt.score / previousAttempt.total) * 100);
+  if (blocked && !submitted) {
+    const pct = Math.round((last.score / last.total) * 100);
     return (
-      <div className="overlay open" onClick={onClose}>
-        <div className="modal" onClick={(e) => e.stopPropagation()}>
-          <button className="close" onClick={onClose}>✕</button>
-          <h3>{quiz.title_ar}</h3>
-          <div style={{ textAlign: 'center', padding: 20 }}>
-            <div style={{ fontSize: 48 }}>{pct >= 80 ? '🏆' : pct >= 50 ? '👍' : '💪'}</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--navy-deep)', marginTop: 8 }}>
-              {previousAttempt.score} / {previousAttempt.total}
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 700, marginTop: 4 }}>{pct}%</div>
-            <div style={{ marginTop: 16, padding: 10, background: 'var(--paper-2)', borderRadius: 8, fontSize: 13 }}>
-              ⚠️ إنت حللت الامتحان ده بالفعل. مسموح بمحاولة واحدة بس.
-            </div>
-          </div>
+      <Shell onOverlay={onClose}>
+        {CloseBtn}
+        <h3>{quiz.title_ar}</h3>
+        <div className="qz-result good">
+          <div style={{ fontSize: 44 }}>{faceFor(pct)}</div>
+          <div className="qz-score">{last.score} / {last.total}</div>
+          <div className="qz-pct">{pct}%</div>
         </div>
-      </div>
+        <div className="info-box warn">
+          ⚠️ {maxAttempts === 1
+            ? 'إنت حللت الامتحان ده بالفعل، والمسموح بمحاولة واحدة بس.'
+            : `استنفدت محاولاتك (${maxAttempts}).`}
+        </div>
+      </Shell>
     );
   }
 
-  /* شاشة البداية */
-  if (startedAt === null) {
+  if (startedAt === null && !submitted) {
     return (
-      <div className="overlay open" onClick={onClose}>
-        <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 500 }}>
-          <button className="close" onClick={onClose}>✕</button>
-          <h3>{quiz.title_ar}</h3>
-          <p className="sub">📝 {quiz.questions.length} أسئلة</p>
-          <div style={{ padding: 16, background: 'var(--paper-2)', borderRadius: 12, marginBottom: 16 }}>
-            <div style={{ marginBottom: 8, fontSize: 14 }}>⏱️ <b>الوقت:</b> {quiz.time_limit_min || 10} دقايق</div>
-            <div style={{ marginBottom: 8, fontSize: 14 }}>🔒 <b>محاولات:</b> مرة واحدة بس</div>
-            <div style={{ fontSize: 14 }}>⚠️ <b>مهم:</b> لو خرجت من الامتحان، الوقت مش هيقف.</div>
-          </div>
-          <button className="btn btn-teal btn-block" onClick={startQuiz}>🚀 ابدأ الامتحان</button>
-        </div>
-      </div>
+      <Shell onOverlay={onClose}>
+        {CloseBtn}
+        <h3>{quiz.title_ar}</h3>
+        <p className="sub">📝 {quiz.questions.length} سؤال</p>
+        <ul className="qz-rules">
+          <li>⏱️ <b>الوقت:</b> {quiz.time_limit_min || 10} دقايق</li>
+          <li>🔒 <b>المحاولات:</b> {maxAttempts === 1 ? 'مرة واحدة بس' : `${maxAttempts - attempts.length} من ${maxAttempts} متبقية`}</li>
+          <li>⚠️ <b>مهم:</b> لو خرجت من الامتحان الوقت مش هيقف، وإجاباتك بتتحفظ.</li>
+        </ul>
+        <button type="button" className="btn btn-teal btn-block" onClick={startQuiz}>🚀 ابدأ الامتحان</button>
+      </Shell>
     );
   }
 
+  const total = quiz.questions.length;
+  const answeredCount = Object.keys(answers).length;
   const totalTime = (quiz.time_limit_min || 10) * 60;
-  const minutes = Math.floor(Math.max(0, timeLeft) / 60);
-  const seconds = Math.max(0, timeLeft) % 60;
+  const mm = Math.floor(Math.max(0, timeLeft) / 60);
+  const ss = String(Math.max(0, timeLeft) % 60).padStart(2, '0');
   const timePct = Math.max(0, (timeLeft / totalTime) * 100);
-  const pct = Math.round((score / quiz.questions.length) * 100);
+  const low = timeLeft < 60;
+  const pct = Math.round((score / total) * 100);
 
   return (
-    <div className="overlay open" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 700, maxHeight: '90vh', overflowY: 'auto' }}>
+    <Shell onOverlay={undefined}>
+      {CloseBtn}
 
-        {/* التايمر */}
-        {!submitted && (
-          <div style={{ position: 'sticky', top: 0, background: 'var(--paper-2)', padding: 12, borderRadius: 10, marginBottom: 16, zIndex: 5 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, fontWeight: 800, fontSize: 15 }}>
-              <span>⏱️ الوقت المتبقي</span>
-              <span style={{ color: timeLeft < 60 ? 'var(--danger)' : 'var(--teal-dark)' }}>
-                {minutes}:{seconds.toString().padStart(2, '0')}
-              </span>
-            </div>
-            <div style={{ width: '100%', height: 8, background: 'var(--line)', borderRadius: 999, overflow: 'hidden' }}>
-              <div style={{ width: `${timePct}%`, height: '100%', background: timeLeft < 60 ? 'var(--danger)' : 'linear-gradient(90deg, var(--teal), var(--gold))', transition: 'width 1s linear' }} />
-            </div>
+      {!submitted && (
+        <div className="qz-bar">
+          <div className="qz-bar-top">
+            <span>⏱️ <b className={`qz-time${low ? ' low' : ''}`} dir="ltr">{mm}:{ss}</b></span>
+            <span className="qz-meta">{answeredCount} / {total} اتجاوب</span>
           </div>
-        )}
+          <div className="qz-track"><div className={`qz-fill${low ? ' low' : ''}`} style={{ width: `${timePct}%` }} /></div>
+        </div>
+      )}
 
-        {submitted && (
-          <div style={{ padding: 20, background: pct >= 50 ? '#E4F2EC' : '#FBE7E2', borderRadius: 12, marginBottom: 20, textAlign: 'center' }}>
-            <div style={{ fontSize: 48 }}>{pct >= 80 ? '🏆' : pct >= 50 ? '👍' : '💪'}</div>
-            <div style={{ fontSize: 24, fontWeight: 900, color: 'var(--navy-deep)' }}>
-              {score} / {quiz.questions.length}
-            </div>
-            <div style={{ fontSize: 18, fontWeight: 700 }}>{pct}%</div>
-            {saving && <div style={{ marginTop: 8, fontSize: 12 }}>جاري الحفظ...</div>}
+      {submitted && (
+        <div className={`qz-result ${pct >= 50 ? 'good' : 'bad'}`}>
+          <div style={{ fontSize: 44 }}>{faceFor(pct)}</div>
+          <div className="qz-score">{score} / {total}</div>
+          <div className="qz-pct">{pct}%</div>
+          {saving && <div className="qz-meta">جاري الحفظ...</div>}
+        </div>
+      )}
+
+      {quiz.questions.map((q, i) => (
+        <div className="qz-q" key={i}>
+          <h4 dir="auto">{i + 1}. {q.question}</h4>
+          <div className="qz-opts">
+            {q.options.map((opt, idx) => {
+              const selected = answers[i] === idx;
+              const right = idx === q.correct;
+              let cls = 'qz-opt';
+              if (submitted) {
+                if (right) cls += ' right';
+                else if (selected) cls += ' wrong';
+              } else if (selected) cls += ' sel';
+              return (
+                <button key={idx} type="button" className={cls} onClick={() => pick(i, idx)} disabled={submitted}>
+                  <span className="qz-letter">{LETTERS[idx] || idx + 1}</span>
+                  <span className="qz-text" dir="auto">{opt}</span>
+                  {submitted && right && <span className="qz-mark">✅</span>}
+                  {submitted && selected && !right && <span className="qz-mark">❌</span>}
+                </button>
+              );
+            })}
           </div>
-        )}
+        </div>
+      ))}
 
-        {quiz.questions.map((q, i) => (
-          <div key={i} style={{ marginBottom: 20, padding: 16, background: 'var(--paper)', borderRadius: 12, border: '1.5px solid var(--line)' }}>
-            <div style={{ fontWeight: 800, marginBottom: 12, color: 'var(--navy-deep)', fontSize: 15 }}>
-              {i + 1}. {q.question}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {q.options.map((opt, idx) => {
-                const isSelected = answers[i] === idx;
-                const isCorrect = idx === q.correct;
-                let bg = 'var(--paper-2)';
-                let border = 'var(--line)';
-                let color = 'var(--ink)';
-                if (submitted) {
-                  if (isCorrect) { bg = '#E4F2EC'; border = 'var(--teal)'; color = 'var(--teal-dark)'; }
-                  else if (isSelected) { bg = '#FBE7E2'; border = 'var(--danger)'; color = 'var(--danger)'; }
-                } else if (isSelected) {
-                  bg = '#FFF9E8'; border = 'var(--gold)'; color = 'var(--navy-deep)';
-                }
-                return (
-                  <button key={idx} type="button"
-                    onClick={() => !submitted && setAnswers({ ...answers, [i]: idx })}
-                    style={{ padding: '12px 16px', background: bg, border: `1.5px solid ${border}`, borderRadius: 10, textAlign: 'start', fontSize: 14, fontFamily: 'inherit', cursor: submitted ? 'default' : 'pointer', fontWeight: isSelected || (submitted && isCorrect) ? 700 : 500, color }}
-                  >
-                    {submitted && isCorrect && '✅ '}
-                    {submitted && isSelected && !isCorrect && '❌ '}
-                    {opt}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        ))}
+      {!submitted ? (
+        <button type="button" className="btn btn-teal btn-block" onClick={handleManualSubmit} disabled={saving}>
+          ✅ تسليم الامتحان
+        </button>
+      ) : (
+        <button type="button" className="btn btn-gold btn-block" onClick={onClose}>تمام</button>
+      )}
 
-        {!submitted && (
-          <button className="btn btn-teal btn-block" onClick={() => handleSubmit(false)} disabled={saving}>
-            {saving ? 'جاري الحفظ...' : '✅ تسليم الامتحان'}
-          </button>
-        )}
-
-        {error && <div className="form-msg error" style={{ display: 'block', marginTop: 12 }}>{error}</div>}
-      </div>
-    </div>
+      {error && <div className="form-msg error">{error}</div>}
+    </Shell>
   );
 }
 

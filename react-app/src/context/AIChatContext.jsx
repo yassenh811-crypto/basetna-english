@@ -1,15 +1,22 @@
 /* ============================================================
    🤖 AIChatContext — إدارة حالة المساعد الذكي
    ============================================================ */
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from './AuthContext';
 
 const AIChatContext = createContext(null);
 
-const API_URL = import.meta.env.VITE_AI_API_URL || 'https://basetna-english.vercel.app';
-const LS_HISTORY = 'basetna_ai_chat';
+/* العنوان: المتغير لو موجود، وإلا نفس دومين الموقع (من غير CORS). محلياً (localhost) بنكلّم الموقع المنشور. */
+const API_URL = (
+  import.meta.env.VITE_AI_API_URL ||
+  (typeof window !== 'undefined' && !/^(localhost|127\.)/.test(window.location.hostname)
+    ? window.location.origin
+    : 'https://basetna-english.online')
+).replace(/\/+$/, '');
+const LS_PREFIX = 'basetna_ai_chat';
 const HISTORY_LIMIT = 10;
+const STORED_LIMIT = 30;
 const TIMEOUT_MS = 45000;
 
 const UI_CONFIG = {
@@ -24,24 +31,30 @@ const UI_CONFIG = {
   ],
 };
 
+const isValid = (m) =>
+  m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant');
+
 export function AIChatProvider({ children }) {
   const { user } = useAuth();
   const [history, setHistory] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
+  /* المحادثة بتتخزن لكل مستخدم لوحده (قبل كده كانت مشتركة بين أي حد يفتح من نفس الجهاز) */
+  const storageKey = user ? `${LS_PREFIX}_${user.id}` : null;
+
   useEffect(() => {
+    if (!storageKey) { setHistory([]); return; }
     try {
-      const stored = JSON.parse(localStorage.getItem(LS_HISTORY) || '[]');
-      if (Array.isArray(stored)) {
-        setHistory(stored.filter((m) => m && typeof m.content === 'string' && (m.role === 'user' || m.role === 'assistant')));
-      }
+      const stored = JSON.parse(localStorage.getItem(storageKey) || '[]');
+      setHistory(Array.isArray(stored) ? stored.filter(isValid) : []);
     } catch (e) { setHistory([]); }
-  }, []);
+  }, [storageKey]);
 
   function saveHistory(newHistory) {
     setHistory(newHistory);
-    try { localStorage.setItem(LS_HISTORY, JSON.stringify(newHistory.slice(-30))); } catch (e) {}
+    if (!storageKey) return;
+    try { localStorage.setItem(storageKey, JSON.stringify(newHistory.slice(-STORED_LIMIT))); } catch (e) {}
   }
 
   async function sendMessage(text) {
@@ -56,7 +69,12 @@ export function AIChatProvider({ children }) {
     saveHistory(newHistory);
 
     try {
-      const messages = before.slice(-HISTORY_LIMIT).concat([{ role: 'user', content: trimmed }]);
+      /* رسائل الأخطاء (isError) ماتتبعتش للسيرفر عشان ماتلخبطش المساعد */
+      const messages = before
+        .filter((m) => !m.isError)
+        .slice(-HISTORY_LIMIT)
+        .map(({ role, content }) => ({ role, content }))
+        .concat([{ role: 'user', content: trimmed }]);
 
       let token = '';
       try {
@@ -71,39 +89,40 @@ export function AIChatProvider({ children }) {
       const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
       let res;
+      let data = null;
       try {
-        res = await fetch(`${API_URL.replace(/\/+$/, '')}/api/ai`, {
+        res = await fetch(`${API_URL}/api/ai`, {
           method: 'POST',
           headers,
           body: JSON.stringify({ messages }),
           signal: controller.signal,
         });
+        try { data = await res.json(); } catch (e) {}
       } catch (e) {
-        clearTimeout(timer);
+        /* السبب الحقيقي يظهر في Console (F12) عشان نعرف نشخّص */
+        console.error('[AI] فشل الاتصال بـ', `${API_URL}/api/ai`, '→', e);
         if (e.name === 'AbortError') throw new Error('الرد اتأخر أوي، جرّب تاني.');
         throw new Error('مش قادر أوصل للسيرفر.');
       } finally {
         clearTimeout(timer);
       }
 
-      let data = null;
-      try { data = await res.json(); } catch (e) {}
-
       if (!res.ok) {
-        if (res.status === 401 || (data && data.code === 'LOGIN_REQUIRED')) {
+        if (res.status === 401 || data?.code === 'LOGIN_REQUIRED') {
           throw new Error('سجّل دخولك الأول عشان تستخدم المساعد الذكي');
         }
-        if (!data || !data.code) throw new Error('سيرفر المساعد مش شغّال.');
+        if (!data?.code) throw new Error('سيرفر المساعد مش شغّال.');
         throw new Error(data.error || 'حصلت مشكلة.');
       }
-      if (!data || !data.reply) throw new Error('الرد جه فاضي، جرّب تاني.');
+      if (!data?.reply) throw new Error('الرد جه فاضي، جرّب تاني.');
 
-      const finalHistory = [...newHistory, { role: 'assistant', content: data.reply }];
-      saveHistory(finalHistory);
+      saveHistory([...newHistory, { role: 'assistant', content: data.reply }]);
       return data.reply;
     } catch (err) {
-      const errorHistory = [...newHistory, { role: 'assistant', content: '⚠️ ' + (err.message || 'حصلت مشكلة') }];
-      saveHistory(errorHistory);
+      saveHistory([
+        ...newHistory,
+        { role: 'assistant', content: '⚠️ ' + (err.message || 'حصلت مشكلة'), isError: true },
+      ]);
       throw err;
     } finally {
       setBusy(false);
@@ -114,11 +133,11 @@ export function AIChatProvider({ children }) {
     saveHistory([]);
   }
 
-  const value = {
-    history, isOpen, setIsOpen, busy,
-    sendMessage, clearChat,
-    config: UI_CONFIG,
-  };
+  const value = useMemo(
+    () => ({ history, isOpen, setIsOpen, busy, sendMessage, clearChat, config: UI_CONFIG }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [history, isOpen, busy, storageKey]
+  );
 
   return <AIChatContext.Provider value={value}>{children}</AIChatContext.Provider>;
 }

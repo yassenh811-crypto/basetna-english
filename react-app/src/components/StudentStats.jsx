@@ -5,11 +5,16 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 
+const CARDS = [
+  { key: 'active_subs', icon: '✅', label: 'اشتراكات فعّالة' },
+  { key: 'lessons_watched', icon: '🎬', label: 'فيديوهات اتفرجت عليها' },
+  { key: 'avg_rating', icon: '⭐', label: 'متوسط تقييماتك' },
+  { key: 'total_points', icon: '🏆', label: 'نقاطك' },
+];
+
 function StudentStats() {
   const { user } = useAuth();
-  const [stats, setStats] = useState({
-    active_subs: 0, lessons_watched: 0, avg_rating: 0, total_points: 0,
-  });
+  const [stats, setStats] = useState({ active_subs: 0, lessons_watched: 0, avg_rating: 0, total_points: 0 });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,23 +28,14 @@ function StudentStats() {
   }, [user]);
 
   return (
-    <div className="kpi-row" style={{ marginBottom: 24 }}>
-      <div className="kpi">
-        <div className="num">{loading ? '—' : stats.active_subs}</div>
-        <div className="label">اشتراكات فعّالة</div>
-      </div>
-      <div className="kpi">
-        <div className="num">{loading ? '—' : stats.lessons_watched}</div>
-        <div className="label">فيديوهات اتفرجت عليها</div>
-      </div>
-      <div className="kpi">
-        <div className="num">{loading ? '—' : stats.avg_rating}</div>
-        <div className="label">متوسط تقييماتك</div>
-      </div>
-      <div className="kpi">
-        <div className="num">{loading ? '—' : stats.total_points}</div>
-        <div className="label">نقاطك</div>
-      </div>
+    <div className="kpi-row kpi-auto" style={{ marginBottom: 24 }}>
+      {CARDS.map((c) => (
+        <div className="kpi" key={c.key}>
+          <span className="kpi-ico" aria-hidden="true">{c.icon}</span>
+          <div className="num">{loading ? '—' : Number(stats[c.key] || 0).toLocaleString('ar-EG')}</div>
+          <div className="label">{c.label}</div>
+        </div>
+      ))}
     </div>
   );
 }

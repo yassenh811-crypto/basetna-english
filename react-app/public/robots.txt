@@ -1,0 +1,43 @@
+# robots.txt for basetna-react-m8sa.vercel.app
+# آخر تحديث: 2026-10-12
+
+# ==================== القواعد العامة ====================
+User-agent: *
+Allow: /
+
+# منع الصفحات المحمية من الفهرسة
+Disallow: /admin
+Disallow: /admin/
+Disallow: /student
+Disallow: /student/
+Disallow: /login
+Disallow: /register
+Disallow: /dashboard
+Disallow: /api/
+
+# منع ملفات النظام والبناء
+Disallow: /assets/
+Disallow: /*.json$
+
+# ==================== Googlebot ====================
+User-agent: Googlebot
+Allow: /
+Disallow: /admin
+Disallow: /student
+Disallow: /login
+Disallow: /register
+
+# ==================== Googlebot-Image ====================
+User-agent: Googlebot-Image
+Allow: /
+
+# ==================== Bingbot ====================
+User-agent: Bingbot
+Allow: /
+Disallow: /admin
+Disallow: /student
+Disallow: /login
+Disallow: /register
+
+# ==================== الروابط المهمة ====================
+Sitemap: https://basetna-react-m8sa.vercel.app/sitemap.xml

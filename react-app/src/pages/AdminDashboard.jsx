@@ -1,8 +1,10 @@
 /* ============================================================
-   👑 AdminDashboard — لوحة تحكم الأدمن
+   👑 AdminDashboard — لوحة تحكم الأدمن (عربي / English)
    ============================================================ */
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useUI } from '../context/UIContext';
+import { useT } from '../i18n/useT';
 import AdminOverview from '../components/admin/AdminOverview';
 import AdminLevels from '../components/admin/AdminLevels';
 import AdminCourses from '../components/admin/AdminCourses';
@@ -12,35 +14,42 @@ import AdminSettings from '../components/admin/AdminSettings';
 
 function AdminDashboard() {
   const { profile, signOut } = useAuth();
+  const { toggleLanguage } = useUI();
+  const { t } = useT();
   const [tab, setTab] = useState('overview');
 
   const tabs = [
-    { id: 'overview', label: 'نظرة عامة' },
-    { id: 'levels', label: 'المراحل الدراسية' },
-    { id: 'courses', label: 'الكورسات' },
-    { id: 'packages', label: 'الباقات' },
-    { id: 'students', label: 'الطلاب والاشتراكات' },
-    { id: 'settings', label: 'الإعدادات' },
+    { id: 'overview', icon: '📊', label: t('tabOverview') },
+    { id: 'levels', icon: '🪜', label: t('tabLevels') },
+    { id: 'courses', icon: '🎬', label: t('tabCourses') },
+    { id: 'packages', icon: '🎁', label: t('tabPackages') },
+    { id: 'students', icon: '👩‍🎓', label: t('tabStudents') },
+    { id: 'settings', icon: '⚙️', label: t('tabSettings') },
   ];
 
   return (
     <div className="dash-shell">
       <aside className="sidebar">
-        <div className="brand"><span className="mark">EN</span> بسّطنا الإنجليزي</div>
+        <div className="brand"><span className="mark">EN</span> {t('brand')}</div>
 
-        {tabs.map((t) => (
+        {tabs.map((x) => (
           <a
-            key={t.id}
+            key={x.id}
             href="#"
-            className={`nav-link ${tab === t.id ? 'active' : ''}`}
-            onClick={(e) => { e.preventDefault(); setTab(t.id); }}
+            className={`nav-link ${tab === x.id ? 'active' : ''}`}
+            aria-current={tab === x.id ? 'page' : undefined}
+            onClick={(e) => { e.preventDefault(); setTab(x.id); }}
           >
-            {t.label}
+            <span aria-hidden="true">{x.icon}</span> {x.label}
           </a>
         ))}
 
+        <div className="side-tools">
+          <button type="button" onClick={toggleLanguage}>🌐 {t('langBtn')}</button>
+        </div>
+
         <a href="#" className="logout" onClick={(e) => { e.preventDefault(); signOut(); }}>
-          تسجيل الخروج
+          🚪 {t('logout')}
         </a>
       </aside>
 

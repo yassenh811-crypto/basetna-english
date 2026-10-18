@@ -19,30 +19,45 @@ function PointsBadge() {
   useEffect(() => {
     async function load() {
       if (!user) return;
-      const { data } = await supabase
+      const { data: row } = await supabase
         .from('user_points')
         .select('*')
         .eq('student_id', user.id)
         .maybeSingle();
-      if (data) setData(data);
+      if (row) setData(row);
     }
     load();
   }, [user]);
 
-  const earnedBadges = BADGE_RULES.filter((b) => data.points >= b.min);
+  const points = data.points || 0;
+  const earned = BADGE_RULES.filter((b) => points >= b.min);
+  const next = BADGE_RULES.find((b) => points < b.min);
+  const prevMin = earned.length ? earned[earned.length - 1].min : 0;
+  const pct = next ? Math.round(((points - prevMin) / (next.min - prevMin)) * 100) : 100;
 
   return (
-    <div style={{ padding: 16, background: 'var(--paper)', borderRadius: 12 }}>
-      <div style={{ fontSize: 32, fontWeight: 900, color: 'var(--gold)' }}>
-        {data.points} نقطة
-      </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-        {earnedBadges.map((b) => (
-          <span key={b.id} style={{ background: 'var(--gold-soft)', padding: '4px 12px', borderRadius: 999, fontSize: 13, fontWeight: 700 }}>
-            {b.name}
-          </span>
-        ))}
-      </div>
+    <div className="points-card">
+      <div className="points-num">⭐ {points.toLocaleString('ar-EG')} <small>نقطة</small></div>
+
+      {earned.length > 0 && (
+        <div className="badges-row">
+          {earned.map((b) => (
+            <span key={b.id} className="badge-chip">{b.name}</span>
+          ))}
+        </div>
+      )}
+
+      {next ? (
+        <div className="next-badge">
+          <div className="next-top">
+            <span>الشارة الجاية: <b>{next.name}</b></span>
+            <span>باقي {next.min - points} نقطة</span>
+          </div>
+          <div className="pp-bar"><div className="pp-fill" style={{ width: `${pct}%` }} /></div>
+        </div>
+      ) : (
+        <div className="next-badge"><span>🎉 وصلت لأعلى شارة!</span></div>
+      )}
     </div>
   );
 }

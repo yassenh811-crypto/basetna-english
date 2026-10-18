@@ -1,57 +1,71 @@
 /* ============================================================
-   🆘 SupportFabs — أزرار الدعم العائمة
+   🆘 SupportFabs — زرار واحد بيفتح قايمة (الدعم / الميس / العام / المساعد الذكي)
    ============================================================ */
+import { useEffect, useState } from 'react';
 import { useUI } from '../context/UIContext';
 import { useAuth } from '../context/AuthContext';
 import { useAIChat } from '../context/AIChatContext';
+import { isStaffFor } from '../context/ChatContext';
 
 function SupportFabs() {
   const { openSupport } = useUI();
-  const { user } = useAuth();
-  const { isOpen, setIsOpen } = useAIChat();
+  const { user, profile } = useAuth();
+  const { setIsOpen: setAIOpen } = useAIChat();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e) => e.key === 'Escape' && setOpen(false);
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  const items = [
+    ...(user ? [{ id: 'ai', icon: '🤖', text: 'مساعد ذكي', run: () => setAIOpen(true) }] : []),
+    ...(user
+      ? [{ id: 'general', icon: '💬', text: isStaffFor('general', profile?.role) ? 'دردشات المراحل' : 'دردشة مرحلتي', run: () => openSupport('general') }]
+      : []),
+    { id: 'owner', icon: '👩‍🏫', text: isStaffFor('owner', profile?.role) ? 'رسائل الميس' : 'مس. شيرهان', run: () => openSupport('owner') },
+    { id: 'support', icon: '🛠️', text: isStaffFor('support', profile?.role) ? 'صندوق الدعم' : 'الدعم الفني', run: () => openSupport('support') },
+  ];
+
+  function choose(item) {
+    setOpen(false);
+    item.run();
+  }
 
   return (
-    <div className="support-fabs">
-      {user && (
+    <>
+      {open && <div className="fab-backdrop" onClick={() => setOpen(false)} />}
+      <div className="support-fabs">
         <button
-          className={`bai-fab ${isOpen ? 'active' : ''}`}
           type="button"
-          title="المساعد الذكي"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-label="المساعد الذكي"
+          className={`fab-toggle${open ? ' open' : ''}`}
+          onClick={() => setOpen((v) => !v)}
+          aria-label={open ? 'إغلاق القايمة' : 'المساعدة والدعم'}
+          aria-expanded={open}
         >
-          <span>🤖</span>
-          <span className="bai-label">مساعد ذكي</span>
+          {open ? '✕' : '💬'}
         </button>
-      )}
 
-      <button
-        className="support-fab support-fab-general"
-        title="الغرفة العامة"
-        onClick={() => openSupport('general')}
-      >
-        <span>💬</span>
-        <span className="fab-label">عام</span>
-      </button>
-
-      <button
-        className="support-fab support-fab-owner"
-        title="مس. شيرهان علي"
-        onClick={() => openSupport('owner')}
-      >
-        <span>👩‍🏫</span>
-        <span className="fab-label">الميس</span>
-      </button>
-
-      <button
-        className="support-fab support-fab-support"
-        title="الدعم الفني"
-        onClick={() => openSupport('support')}
-      >
-        <span>🛠️</span>
-        <span className="fab-label">دعم فني</span>
-      </button>
-    </div>
+        {open && (
+          <div className="fab-menu">
+            {items.map((it, i) => (
+              <button
+                key={it.id}
+                type="button"
+                className="fab-item"
+                style={{ animationDelay: `${i * 45}ms` }}
+                onClick={() => choose(it)}
+              >
+                <span className="fab-text">{it.text}</span>
+                <span className={`fab-ico ${it.id}`}>{it.icon}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 

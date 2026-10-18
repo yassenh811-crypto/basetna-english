@@ -4,21 +4,23 @@
 import { useState } from 'react';
 import { supabase } from '../../services/supabase';
 
-const API_URL =
-  import.meta.env.VITE_AI_API_URL || 'https://basetna-server.vercel.app';
+const API_URL = import.meta.env.VITE_AI_API_URL || 'https://basetna-server.vercel.app';
 
 function GenerateQuizButton({ lesson, onGenerated }) {
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState('');
-  const [msgType, setMsgType] = useState('');
+  const [toast, setToast] = useState({ text: '', type: '' });
+
+  function show(text, type, ms = 4000) {
+    setToast({ text, type });
+    if (ms) setTimeout(() => setToast({ text: '', type: '' }), ms);
+  }
 
   async function handleGenerate() {
     if (loading) return;
-    if (!confirm(`عايز AI يعمل امتحان لدرس "${lesson.title_ar}"؟`)) return;
+    if (!confirm(`عايز AI يعمل امتحان لدرس "${lesson.title_ar}"؟\n(لو فيه امتحان قديم هيتبدل)`)) return;
 
     setLoading(true);
-    setMsg('⏳ جاري التوليد...');
-    setMsgType('ok');
+    show('⏳ جاري توليد الامتحان... ممكن ياخد نص دقيقة', 'ok', 0);
 
     try {
       let token = '';
@@ -60,46 +62,33 @@ function GenerateQuizButton({ lesson, onGenerated }) {
         },
         { onConflict: 'lesson_id' }
       );
-
       if (error) throw error;
 
-      setMsg('✅ تم إنشاء الامتحان');
-      setMsgType('ok');
+      show('✅ تم إنشاء الامتحان', 'ok');
       if (onGenerated) onGenerated();
-      setTimeout(() => setMsg(''), 3000);
     } catch (err) {
       console.error('❌', err);
-      setMsg('❌ ' + (err.message || 'فشل التوليد'));
-      setMsgType('error');
-      setTimeout(() => setMsg(''), 5000);
+      show('❌ ' + (err.message || 'فشل التوليد'), 'error', 6000);
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div style={{ display: 'inline-block', position: 'relative' }}>
+    <>
       <button
-        className="icon-btn"
-        style={{ background: loading ? 'var(--paper-2)' : 'var(--purple)', color: '#fff' }}
+        type="button"
+        className="icon-btn ai"
         onClick={handleGenerate}
         disabled={loading}
         title="توليد امتحان بالذكاء الاصطناعي"
       >
         {loading ? '⏳' : '🎓 AI'}
       </button>
-      {msg && (
-        <div style={{
-          position: 'absolute', top: '100%', insetInlineStart: 0, marginTop: 4,
-          padding: '4px 8px', fontSize: 11, fontWeight: 700, borderRadius: 6,
-          whiteSpace: 'nowrap', zIndex: 10,
-          background: msgType === 'error' ? '#FBE7E2' : '#E4F2EC',
-          color: msgType === 'error' ? 'var(--danger)' : 'var(--teal-dark)',
-        }}>
-          {msg}
-        </div>
+      {toast.text && (
+        <div className={`global-toast show ${toast.type === 'ok' ? 'ok' : ''}`}>{toast.text}</div>
       )}
-    </div>
+    </>
   );
 }
 

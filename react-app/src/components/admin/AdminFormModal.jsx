@@ -1,35 +1,51 @@
 /* ============================================================
    📝 AdminFormModal — Modal موحّد للنماذج
+   - مفيش قفل بالضغط بره (عشان الداتا متضيعش بالغلط)
+   - Esc / زرار إلغاء / ✕ للإغلاق
    ============================================================ */
 import { useEffect } from 'react';
 
-function AdminFormModal({ open, title, onClose, onSubmit, children, loading }) {
-  /* Escape للإغلاق */
+function AdminFormModal({
+  open,
+  title,
+  subtitle,
+  onClose,
+  onSubmit,
+  children,
+  loading,
+  submitLabel = 'حفظ',
+  wide = false,
+}) {
   useEffect(() => {
-    function handleKey(e) {
-      if (e.key === 'Escape') onClose();
-    }
-    if (open) document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [open, onClose]);
+    if (!open) return;
+    const onKey = (e) => e.key === 'Escape' && !loading && onClose();
+    document.addEventListener('keydown', onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [open, onClose, loading]);
 
   if (!open) return null;
 
   return (
-    <div className="overlay open" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <button className="close" onClick={onClose} type="button">✕</button>
+    <div className="overlay open">
+      <div className={`modal${wide ? ' wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
+        <button className="close" onClick={onClose} type="button" aria-label="إغلاق">✕</button>
         <h3>{title}</h3>
+        {subtitle && <p className="sub">{subtitle}</p>}
         <form onSubmit={onSubmit}>
           {children}
-          <button
-            className="btn btn-gold btn-block"
-            type="submit"
-            disabled={loading}
-            style={{ marginTop: 16 }}
-          >
-            {loading ? 'جاري الحفظ...' : 'حفظ'}
-          </button>
+          <div className="modal-actions">
+            <button type="button" className="btn btn-ghost" onClick={onClose} disabled={loading}>
+              إلغاء
+            </button>
+            <button className="btn btn-gold" type="submit" disabled={loading}>
+              {loading ? 'جاري الحفظ...' : submitLabel}
+            </button>
+          </div>
         </form>
       </div>
     </div>

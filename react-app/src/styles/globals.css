@@ -36,24 +36,21 @@
   --ai-dark: #3B2FA8;
   --ease: cubic-bezier(.22, 1, .36, 1);
   --ring: 0 0 0 4px rgba(199, 154, 61, .18);
+
+  /* ---- أسطح وألوان دلالية (بتتبدل في الوضع الليلي) ---- */
+  --surface: #FFFFFF;
+  --hover-wash: #FBF7EF;
+  --heading: var(--navy-deep);
+  --gold-wash: #FFF8E6;
+  --teal-wash: #E4F2EC;
+  --danger-wash: #FBE7E2;
+  --purple-wash: #F3E5F5;
+  --ai-wash: #F6F5FD;
+  --display: 'El Messiri', 'Cairo', 'Segoe UI', sans-serif;
+  color-scheme: light;
 }
 
-/* ============================================================
-   2. Dark Mode
-   ============================================================ */
-[data-theme="dark"] {
-  --paper: #1a1a2e;
-  --paper-2: #16213e;
-  --ink: #eaeaea;
-  --ink-soft: #b0b0b0;
-  --line: #2a2a4a;
-  --navy: #0f0f1e;
-  --navy-deep: #05050f;
-  --navy-mid: #1a1a3e;
-  --gold: #d4a84b;
-  --gold-soft: #e8ce94;
-  --teal: #3a9d8a;
-}
+/* ملحوظة: الوضع الليلي كله في theme-dark.css (بيتحمّل آخر ملف) */
 
 /* ============================================================
    3. Reset + Base
@@ -70,6 +67,10 @@ html, body {
   margin: 0;
   padding: 0;
 }
+
+h1, h2, h3 { font-family: var(--display); }
+
+:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; border-radius: 6px; }
 
 body {
   font-family: var(--font);
@@ -105,7 +106,7 @@ input, select, textarea {
 
 ::selection {
   background: var(--gold-soft);
-  color: var(--navy-deep);
+  color:var(--heading);
 }
 
 .container {
@@ -242,7 +243,7 @@ section.block {
 .section-head h2 {
   font-size: clamp(24px, 3.6vw, 31px);
   margin: 0 0 12px;
-  color: var(--navy-deep);
+  color:var(--heading);
   font-weight: 800;
 }
 
@@ -263,67 +264,29 @@ section.block {
 }
 
 /* ============================================================
-   7. Dark Mode — عناصر إضافية
+   🛡️ حماية الفيديو
    ============================================================ */
-[data-theme="dark"] body {
-  background: var(--paper);
-  color: var(--ink);
+.video-wrapper {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  pointer-events: auto;
 }
 
-[data-theme="dark"] .card,
-[data-theme="dark"] .kpi,
-[data-theme="dark"] .table-wrap {
-  background: var(--paper-2);
-  border-color: var(--line);
+.video-wrapper * {
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
-[data-theme="dark"] .modal {
-  background: var(--paper-2);
+.video-wrapper video,
+.video-wrapper iframe {
+  pointer-events: auto;
+  user-select: none;
 }
 
-[data-theme="dark"] .field input,
-[data-theme="dark"] .field select,
-[data-theme="dark"] .field textarea {
-  background: var(--paper);
-  color: var(--ink);
-  border-color: var(--line);
-}
-
-[data-theme="dark"] th {
-  background: var(--navy);
-  color: var(--ink);
-}
-
-[data-theme="dark"] .sidebar {
-  background: linear-gradient(180deg, #05050f 0%, #0f0f1e 100%);
-}
-
-[data-theme="dark"] .bai-body {
-  background: linear-gradient(180deg, #1a1a2e, #16213e);
-}
-
-[data-theme="dark"] .bai-msg.bot {
-  background: var(--paper-2);
-  color: var(--ink);
-}
-
-[data-theme="dark"] .search-box input {
-  background: var(--paper-2);
-  color: var(--ink);
-  border-color: var(--line);
-}
-
-[data-theme="dark"] .dashboard-head h1,
-[data-theme="dark"] .section-head h2,
-[data-theme="dark"] .kpi .num {
-  color: var(--ink);
-}
-
-[data-theme="dark"] .empty-state {
-  color: var(--ink-soft);
-  border-color: var(--line);
-}
-
-[data-theme="dark"] .global-toast {
-  background: #0F2A24;
+/* منع تحديد النص على الموقع كله (اختياري) */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
 }

@@ -6,17 +6,28 @@ import { createClient } from '@supabase/supabase-js';
 import { supabase } from '../../services/supabase';
 import AdminFormModal from './AdminFormModal';
 import SubscriptionForm from './SubscriptionForm';
+import { AdminToolbar, StateRow, RowActions } from './AdminUI';
 
 const SUPABASE_URL =
-  import.meta.env.VITE_SUPABASE_URL ||
-  'https://wgostqkywpybmzgbyzeo.supabase.co';
+  import.meta.env.VITE_SUPABASE_URL || 'https://wgostqkywpybmzgbyzeo.supabase.co';
 const SUPABASE_ANON_KEY =
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  'sb_publishable_zx0zeWR2bpbmyO90oN-4ow_FxZCSPl8';
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_zx0zeWR2bpbmyO90oN-4ow_FxZCSPl8';
+
+const EMPTY = {
+  full_name: '',
+  email: '',
+  password: '',
+  phone: '',
+  grade_level_id: '',
+  role: 'student',
+};
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
 function AdminStudents() {
   const [students, setStudents] = useState([]);
   const [levels, setLevels] = useState([]);
+  const [subs, setSubs] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -24,28 +35,26 @@ function AdminStudents() {
   const [msg, setMsg] = useState({ text: '', type: '' });
   const [subscriptionStudent, setSubscriptionStudent] = useState(null);
   const [search, setSearch] = useState('');
-
-  const [form, setForm] = useState({
-    full_name: '',
-    email: '',
-    password: '',
-    phone: '',
-    grade_level_id: '',
-    role: 'student',
-  });
+  const [form, setForm] = useState(EMPTY);
 
   async function loadData() {
     setLoading(true);
-    const [sRes, lRes] = await Promise.all([
-      supabase
-        .from('profiles')
-        .select('*')
-        .eq('role', 'student')
-        .order('created_at', { ascending: false }),
+    const [sRes, lRes, subRes] = await Promise.all([
+      supabase.from('profiles').select('*').eq('role', 'student').order('created_at', { ascending: false }),
       supabase.from('grade_levels').select('*').order('sort_order'),
+      supabase.from('subscriptions').select('student_id,status,end_date'),
     ]);
+
+    const map = {};
+    (subRes.data || []).forEach((s) => {
+      if (s.status !== 'active') return;
+      const end = s.end_date || '9999-12-31';
+      if (!map[s.student_id] || end > map[s.student_id]) map[s.student_id] = end;
+    });
+
     setStudents(sRes.data || []);
     setLevels(lRes.data || []);
+    setSubs(map);
     setLoading(false);
   }
 
@@ -53,16 +62,16 @@ function AdminStudents() {
     loadData();
   }, []);
 
+  function subState(id) {
+    const end = subs[id];
+    if (!end) return { cls: 'none', text: 'غير مشترك' };
+    if (end >= todayStr()) return { cls: 'active', text: end === '9999-12-31' ? 'فعّال' : `فعّال لحد ${end}` };
+    return { cls: 'expired', text: `انتهى ${end}` };
+  }
+
   function openAddModal() {
     setEditing(null);
-    setForm({
-      full_name: '',
-      email: '',
-      password: '',
-      phone: '',
-      grade_level_id: '',
-      role: 'student',
-    });
+    setForm(EMPTY);
     setMsg({ text: '', type: '' });
     setModalOpen(true);
   }
@@ -81,27 +90,20 @@ function AdminStudents() {
     setModalOpen(true);
   }
 
+  const fail = (text) => {
+    setMsg({ text: '❌ ' + text, type: 'error' });
+    setSaving(false);
+  };
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
     setMsg({ text: '', type: '' });
 
     if (!editing) {
-      if (!form.full_name.trim()) {
-        setMsg({ text: '❌ اكتب اسم الطالب', type: 'error' });
-        setSaving(false);
-        return;
-      }
-      if (!form.email.trim()) {
-        setMsg({ text: '❌ اكتب الإيميل', type: 'error' });
-        setSaving(false);
-        return;
-      }
-      if (!form.password || form.password.length < 6) {
-        setMsg({ text: '❌ كلمة المرور 6+ حروف', type: 'error' });
-        setSaving(false);
-        return;
-      }
+      if (!form.full_name.trim()) return fail('اكتب اسم الطالب');
+      if (!form.email.trim()) return fail('اكتب الإيميل');
+      if (!form.password || form.password.length < 6) return fail('كلمة المرور 6+ حروف');
 
       const tempClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
         auth: {
@@ -115,19 +117,10 @@ function AdminStudents() {
         email: form.email.trim().toLowerCase(),
         password: form.password,
       });
-
-      if (authError) {
-        setMsg({ text: '❌ ' + authError.message, type: 'error' });
-        setSaving(false);
-        return;
-      }
+      if (authError) return fail(authError.message);
 
       const userId = authData.user?.id;
-      if (!userId) {
-        setMsg({ text: '❌ محتاج تأكيد الإيميل', type: 'error' });
-        setSaving(false);
-        return;
-      }
+      if (!userId) return fail('محتاج تأكيد الإيميل');
 
       const { error: profileError } = await supabase.from('profiles').upsert(
         {
@@ -139,12 +132,7 @@ function AdminStudents() {
         },
         { onConflict: 'id' }
       );
-
-      if (profileError) {
-        setMsg({ text: '❌ ' + profileError.message, type: 'error' });
-        setSaving(false);
-        return;
-      }
+      if (profileError) return fail(profileError.message);
 
       setSaving(false);
       setModalOpen(false);
@@ -158,31 +146,21 @@ function AdminStudents() {
       grade_level_id: form.grade_level_id || null,
       role: form.role || 'student',
     };
-    const { error } = await supabase
-      .from('profiles')
-      .update(payload)
-      .eq('id', editing.id);
+    const { error } = await supabase.from('profiles').update(payload).eq('id', editing.id);
+    if (error) return fail(error.message);
+
     setSaving(false);
-
-    if (error) {
-      setMsg({ text: '❌ ' + error.message, type: 'error' });
-      return;
-    }
-
     setModalOpen(false);
     await loadData();
   }
 
   async function handleDelete(student) {
-    if (!confirm(`متأكد إنك عايز تحذف "${student.full_name}"؟`)) return;
+    if (!confirm(`متأكد إنك عايز تحذف "${student.full_name}"؟ الحذف نهائي.`)) return;
     await supabase.from('subscriptions').delete().eq('student_id', student.id);
     await supabase.from('messages').delete().eq('sender_id', student.id);
     await supabase.from('course_ratings').delete().eq('student_id', student.id);
     await supabase.from('lesson_progress').delete().eq('student_id', student.id);
-    const { error } = await supabase
-      .from('profiles')
-      .delete()
-      .eq('id', student.id);
+    const { error } = await supabase.from('profiles').delete().eq('id', student.id);
     if (error) {
       alert('❌ ' + error.message);
       return;
@@ -190,99 +168,66 @@ function AdminStudents() {
     await loadData();
   }
 
-  function levelName(id) {
-    return levels.find((l) => l.id === id)?.name_ar || '—';
-  }
+  const levelName = (id) => levels.find((l) => l.id === id)?.name_ar || '—';
 
-  const filteredStudents = students.filter(
+  const q = search.toLowerCase();
+  const filtered = students.filter(
     (s) =>
-      (s.full_name || '').toLowerCase().includes(search.toLowerCase()) ||
+      (s.full_name || '').toLowerCase().includes(q) ||
       (s.phone || '').includes(search) ||
-      levelName(s.grade_level_id).toLowerCase().includes(search.toLowerCase())
+      levelName(s.grade_level_id).toLowerCase().includes(q)
   );
 
   return (
     <>
-      <div className="dash-head" style={{ flexWrap: 'wrap', gap: 10 }}>
-        <h1>الطلاب والاشتراكات</h1>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <input
-            type="text"
-            placeholder="🔍 ابحث بالاسم أو الهاتف..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            style={{
-              padding: '10px 16px',
-              border: '1.5px solid var(--line)',
-              borderRadius: 999,
-              fontSize: 14,
-              minWidth: 220,
-              background: '#fff',
-            }}
-          />
-          <button className="btn btn-gold btn-sm" onClick={openAddModal}>
-            + إضافة طالب
-          </button>
-        </div>
-      </div>
+      <AdminToolbar
+        title="الطلاب والاشتراكات"
+        count={students.length}
+        search={search}
+        onSearch={setSearch}
+        placeholder="ابحث بالاسم أو الهاتف..."
+        addLabel="إضافة طالب"
+        onAdd={openAddModal}
+      />
 
-      <div className="table-wrap">
+      <div className="table-wrap stack">
         <table>
           <thead>
             <tr>
               <th>الاسم</th>
               <th>الهاتف</th>
               <th>المرحلة</th>
+              <th>الاشتراك</th>
               <th>إجراءات</th>
             </tr>
           </thead>
           <tbody>
-            {loading ? (
-              <tr>
-                <td colSpan="4">
-                  <div className="empty-state">جاري التحميل...</div>
-                </td>
-              </tr>
-            ) : filteredStudents.length === 0 ? (
-              <tr>
-                <td colSpan="4">
-                  <div className="empty-state">
-                    {search ? 'مفيش نتايج' : 'لسه مفيش طلاب'}
-                  </div>
-                </td>
-              </tr>
-            ) : (
-              filteredStudents.map((s) => (
-                <tr key={s.id}>
-                  <td>
-                    <b>{s.full_name}</b>
-                  </td>
-                  <td>{s.phone || '—'}</td>
-                  <td>{levelName(s.grade_level_id)}</td>
-                  <td>
-                    <button
-                      className="icon-btn"
-                      onClick={() => setSubscriptionStudent(s)}
-                      style={{ background: 'var(--teal)', color: '#fff' }}
-                    >
-                      💳 الاشتراك
-                    </button>
-                    <button
-                      className="icon-btn"
-                      onClick={() => openEditModal(s)}
-                    >
-                      ✏️
-                    </button>
-                    <button
-                      className="icon-btn danger"
-                      onClick={() => handleDelete(s)}
-                    >
-                      🗑️
-                    </button>
-                  </td>
-                </tr>
-              ))
-            )}
+            <StateRow colSpan={5} loading={loading} />
+            <StateRow colSpan={5} empty={!loading && filtered.length === 0} text={search ? 'مفيش نتايج' : 'لسه مفيش طلاب'} />
+            {!loading &&
+              filtered.map((s) => {
+                const st = subState(s.id);
+                return (
+                  <tr key={s.id}>
+                    <td data-label="الاسم">
+                      <div className="cell-course">
+                        <span className="avatar-dot">{(s.full_name || '?').trim().charAt(0)}</span>
+                        <b>{s.full_name}</b>
+                      </div>
+                    </td>
+                    <td data-label="الهاتف" dir="ltr" className="num-cell">{s.phone || '—'}</td>
+                    <td data-label="المرحلة"><span className="level-chip">{levelName(s.grade_level_id)}</span></td>
+                    <td data-label="الاشتراك"><span className={`badge ${st.cls}`}>{st.text}</span></td>
+                    <td data-label="إجراءات">
+                      <RowActions>
+                        <button className="icon-btn primary" onClick={() => setSubscriptionStudent(s)}>💳 الاشتراك</button>
+                        <button className="icon-btn" onClick={() => openEditModal(s)} aria-label="تعديل">✏️</button>
+                        <button className="icon-btn danger" onClick={() => handleDelete(s)} aria-label="حذف">🗑️</button>
+                      </RowActions>
+                    </td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </div>
@@ -296,67 +241,38 @@ function AdminStudents() {
       >
         <div className="field">
           <label>الاسم الكامل</label>
-          <input
-            type="text"
-            value={form.full_name}
-            onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-            required
-          />
+          <input type="text" value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} required />
         </div>
         {!editing && (
           <>
             <div className="field">
               <label>الإيميل</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                required
-              />
+              <input type="email" dir="ltr" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
             </div>
             <div className="field">
               <label>كلمة المرور</label>
-              <input
-                type="text"
-                value={form.password}
-                onChange={(e) => setForm({ ...form, password: e.target.value })}
-                minLength={6}
-                required
-              />
+              <input type="text" dir="ltr" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} minLength={6} required />
+              <small className="hint">ظاهرة عشان تقدر تبعتها للطالب (6 حروف على الأقل).</small>
             </div>
           </>
         )}
         <div className="field">
           <label>رقم الهاتف</label>
-          <input
-            type="tel"
-            value={form.phone}
-            onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          />
+          <input type="tel" dir="ltr" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
         </div>
         <div className="field">
           <label>المرحلة</label>
-          <select
-            value={form.grade_level_id}
-            onChange={(e) =>
-              setForm({ ...form, grade_level_id: e.target.value })
-            }
-          >
+          <select value={form.grade_level_id} onChange={(e) => setForm({ ...form, grade_level_id: e.target.value })}>
             <option value="">— اختار مرحلة —</option>
             {levels.map((lv) => (
-              <option key={lv.id} value={lv.id}>
-                {lv.name_ar}
-              </option>
+              <option key={lv.id} value={lv.id}>{lv.name_ar}</option>
             ))}
           </select>
         </div>
         {editing && (
           <div className="field">
             <label>الدور</label>
-            <select
-              value={form.role}
-              onChange={(e) => setForm({ ...form, role: e.target.value })}
-            >
+            <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
               <option value="student">🎓 طالب</option>
               <option value="support">🛠️ دعم فني</option>
               <option value="owner">👩‍🏫 ميس</option>
@@ -364,14 +280,7 @@ function AdminStudents() {
             </select>
           </div>
         )}
-        {msg.text && (
-          <div
-            className={`form-msg ${msg.type}`}
-            style={{ display: 'block' }}
-          >
-            {msg.text}
-          </div>
-        )}
+        {msg.text && <div className={`form-msg ${msg.type}`}>{msg.text}</div>}
       </AdminFormModal>
 
       {subscriptionStudent && (

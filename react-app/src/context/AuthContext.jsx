@@ -1,7 +1,7 @@
 /* ============================================================
    🔐 AuthContext — إدارة تسجيل الدخول
    ============================================================ */
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import { supabase } from '../services/supabase';
 
 const AuthContext = createContext(null);
@@ -23,14 +23,10 @@ export function AuthProvider({ children }) {
         .select('*')
         .eq('id', userId)
         .maybeSingle();
-      if (error) {
-        console.error('❌ [Auth] Profile error:', error);
-        setProfile(null);
-        return;
-      }
+      if (error) throw error;
       setProfile(data);
     } catch (err) {
-      console.error('❌ [Auth] Catch:', err);
+      console.error('❌ [Auth] Profile error:', err);
       setProfile(null);
     }
   }, []);
@@ -38,40 +34,31 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true;
 
-    async function init() {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        if (!mounted) return;
-        if (session?.user) {
-          setUser(session.user);
-          await loadProfile(session.user.id);
-        } else {
-          setUser(null);
-          setProfile(null);
-        }
-      } catch (err) {
-        console.error('❌ [Auth] Init error:', err);
-      } finally {
-        if (mounted) setLoading(false);
+    async function applySession(session) {
+      if (!mounted) return;
+      if (session?.user) {
+        setUser(session.user);
+        await loadProfile(session.user.id);
+      } else {
+        setUser(null);
+        setProfile(null);
       }
+      if (mounted) setLoading(false);
     }
 
-    init();
+    supabase.auth
+      .getSession()
+      .then(({ data }) => applySession(data?.session))
+      .catch((err) => {
+        console.error('❌ [Auth] Init error:', err);
+        if (mounted) setLoading(false);
+      });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (!mounted) return;
-        if (session?.user) {
-          setUser(session.user);
-          await loadProfile(session.user.id);
-        } else {
-          setUser(null);
-          setProfile(null);
-        }
-        setLoading(false);
-      }
-    );
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      /* مهم: ماينفعش نعمل await لأي نداء Supabase جوه الـ callback مباشرة
+         (ممكن يعلّق الـ auth). بنأجّله بـ setTimeout عشان نتفادى الـ deadlock. */
+      setTimeout(() => applySession(session), 0);
+    });
 
     return () => {
       mounted = false;
@@ -79,26 +66,21 @@ export function AuthProvider({ children }) {
     };
   }, [loadProfile]);
 
-  async function signIn(email, password) {
+  const signIn = useCallback(async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
-  }
+  }, []);
 
-  async function signOut() {
-    await supabase.auth.signOut();
+  const signOut = useCallback(async () => {
+    try { await supabase.auth.signOut(); } catch (e) {}
     setUser(null);
     setProfile(null);
-  }
+  }, []);
 
-  const value = {
-    user,
-    profile,
-    loading,
-    showAuthModal,
-    setShowAuthModal,
-    signIn,
-    signOut,
-  };
+  const value = useMemo(
+    () => ({ user, profile, loading, showAuthModal, setShowAuthModal, signIn, signOut }),
+    [user, profile, loading, showAuthModal, signIn, signOut]
+  );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

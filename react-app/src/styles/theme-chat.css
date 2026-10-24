@@ -1,0 +1,184 @@
+/* ============================================================
+   theme-chat.css — الدعم + الجروب + خانة رقم الواتساب
+   ترتيب التحميل:
+   style.css → theme-upgrade.css → theme-pro.css → theme-i18n.css → theme-chat.css
+   بيستخدم متغيرات theme-pro. كل الكلاسات بتبدأ بـ bc- عشان ماتتعارضش
+   مع .msg / .inbox-item / .support-* الموجودة عندك.
+   ============================================================ */
+
+/* ---------- عنوان القسم عند الطالب ---------- */
+.bc-head{margin-bottom:16px;}
+.bc-head h2{margin:0 0 4px;font-size:clamp(20px,2.6vw,26px);color:var(--navy-deep);}
+.bc-head p{margin:0;color:var(--ink-soft);}
+
+/* ---------- الإطار العام للشات ---------- */
+.bc-panel{
+  display:flex;flex-direction:column;
+  height:clamp(440px,calc(100dvh - 250px),700px);
+  background:#fff;border:1px solid var(--line);border-radius:var(--r-m);
+  box-shadow:var(--sh-1);overflow:hidden;
+}
+.bc-chat{display:flex;flex-direction:column;flex:1;min-height:0;}
+.bc-list{
+  flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  display:flex;flex-direction:column;gap:6px;padding:16px;
+  background:
+    radial-gradient(600px 240px at 100% 0, rgba(201,154,59,.07), transparent 70%),
+    var(--paper);
+}
+.bc-state{margin:auto;padding:28px 16px;text-align:center;color:var(--ink-soft);}
+.bc-state.bad{color:var(--danger);}
+
+/* ---------- الرسايل ---------- */
+.bc-day{text-align:center;margin:10px 0 4px;}
+.bc-day span{
+  display:inline-block;padding:3px 14px;border-radius:999px;
+  background:var(--paper-2);color:var(--ink-soft);font-size:12.5px;font-weight:600;
+}
+.bc-msg{display:flex;flex-direction:column;gap:3px;max-width:min(78%,520px);}
+.bc-msg.mine{margin-inline-start:auto;}
+.bc-msg.theirs{margin-inline-end:auto;}
+
+.bc-sender{padding-inline:6px;font-size:12.5px;font-weight:700;color:var(--teal-dark);}
+.bc-role{
+  font-style:normal;margin-inline-start:6px;padding:0 8px;border-radius:6px;
+  background:var(--gold-soft);color:var(--navy-deep);font-size:11.5px;font-weight:700;
+}
+
+.bc-bubble{padding:9px 13px 6px;border-radius:16px;box-shadow:var(--sh-1);}
+.bc-msg.mine .bc-bubble{background:var(--navy);color:#fff;border-end-end-radius:5px;}
+.bc-msg.theirs .bc-bubble{
+  background:#fff;color:var(--navy-deep);border:1px solid var(--line);border-end-start-radius:5px;
+}
+.bc-text{
+  margin:0;max-width:none;font-size:15px;line-height:1.65;
+  white-space:pre-wrap;overflow-wrap:anywhere;
+}
+.bc-meta{
+  display:flex;align-items:center;justify-content:flex-end;gap:8px;margin-top:2px;
+  font-size:11.5px;color:var(--ink-soft);
+}
+.bc-msg.mine .bc-meta{color:#C9D6EA;}
+.bc-tick.seen{color:var(--gold-soft);}
+.bc-del{background:none;border:0;padding:0 2px;cursor:pointer;opacity:.6;font-size:13px;}
+.bc-del:hover{opacity:1;}
+
+/* ---------- كتابة الرسالة ---------- */
+.bc-composer{
+  display:flex;align-items:flex-end;gap:10px;padding:12px;
+  background:#fff;border-top:1px solid var(--line);
+}
+.bc-composer textarea{
+  flex:1;min-width:0;max-height:120px;resize:none;
+  padding:10px 12px;border:1.5px solid var(--line);border-radius:var(--r-s);
+  background:var(--paper);font:inherit;font-size:15px;line-height:1.5;
+}
+.bc-composer textarea:focus{border-color:var(--teal);}
+.bc-composer .btn{align-self:stretch;}
+.bc-locked{
+  padding:14px 16px;text-align:center;font-weight:600;
+  background:var(--paper-2);color:var(--ink-soft);border-top:1px solid var(--line);
+}
+.bc-err{padding:8px 14px;background:#FBE7E2;color:var(--danger);font-size:13.5px;}
+
+/* ---------- شريط تحكم الأونر في الجروب ---------- */
+.bc-lockbar{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:10px 14px;background:var(--paper);border-bottom:1px solid var(--line);font-size:14px;font-weight:600;
+}
+.bc-lockbar .open{color:var(--teal-dark);}
+.bc-lockbar .closed{color:var(--danger);}
+
+/* ---------- صفحة الدعم عند الأونر: قايمة + محادثة ---------- */
+.bc-split{
+  display:grid;grid-template-columns:minmax(260px,340px) 1fr;
+  height:clamp(460px,calc(100dvh - 250px),720px);
+  background:#fff;border:1px solid var(--line);border-radius:var(--r-m);
+  box-shadow:var(--sh-1);overflow:hidden;
+}
+.bc-people{display:flex;flex-direction:column;min-height:0;border-inline-end:1px solid var(--line);}
+.bc-people-tools{display:grid;gap:10px;padding:12px;border-bottom:1px solid var(--line);}
+.bc-people-tools .search-box{margin:0;max-width:none;}
+.bc-chips{display:flex;gap:8px;}
+.bc-chips button{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:999px;
+  border:1px solid var(--line);background:#fff;color:var(--ink-soft);
+  font:600 13.5px var(--font);cursor:pointer;
+}
+.bc-chips button.active{background:var(--navy-deep);border-color:var(--navy-deep);color:#fff;}
+.bc-chips b{
+  min-width:20px;height:20px;padding:0 6px;border-radius:999px;display:inline-grid;place-items:center;
+  background:var(--gold);color:var(--navy-deep);font-size:12px;
+}
+
+.bc-people-list{list-style:none;margin:0;padding:0;flex:1;min-height:0;overflow-y:auto;}
+.bc-person{
+  display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;
+  width:100%;padding:12px 14px;text-align:start;cursor:pointer;
+  background:none;border:0;border-bottom:1px solid var(--line);
+  border-inline-start:4px solid transparent;font:inherit;color:inherit;
+}
+.bc-person:hover{background:var(--paper);}
+.bc-person.active{background:var(--paper-2);border-inline-start-color:var(--gold);}
+.bc-ava{
+  width:40px;height:40px;flex-shrink:0;border-radius:12px;display:grid;place-items:center;
+  background:linear-gradient(145deg,var(--gold-soft),var(--gold));
+  color:var(--navy-deep);font-family:var(--display);font-size:18px;font-weight:700;
+}
+.bc-person-body{display:grid;min-width:0;}
+.bc-person-name{font-weight:700;color:var(--navy-deep);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bc-person-prev{font-size:13px;color:var(--ink-soft);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bc-person-side{display:grid;justify-items:end;gap:4px;font-size:12px;color:var(--ink-soft);}
+.bc-unread{
+  min-width:22px;height:22px;padding:0 6px;border-radius:999px;display:grid;place-items:center;
+  background:var(--teal);color:#fff;font-size:12px;
+}
+
+.bc-thread{display:flex;flex-direction:column;min-width:0;min-height:0;}
+.bc-thread-head{
+  display:flex;align-items:center;gap:12px;padding:12px 16px;
+  background:var(--paper);border-bottom:1px solid var(--line);
+}
+.bc-thread-id{display:grid;min-width:0;margin-inline-end:auto;}
+.bc-thread-id strong{color:var(--navy-deep);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bc-thread-id small{color:var(--ink-soft);text-align:start;}
+.bc-back{
+  display:none;width:36px;height:36px;border-radius:10px;border:1px solid var(--line);
+  background:#fff;font-size:22px;line-height:1;cursor:pointer;place-items:center;
+}
+.bc-wa{background:#1FA855;color:#fff;border:0;}
+.bc-wa:hover{background:#188A45;}
+.bc-pick{margin:auto;}
+
+/* ---------- عدّاد الرسايل في الـ sidebar ---------- */
+.nav-badge{
+  margin-inline-start:auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;
+  display:inline-grid;place-items:center;
+  background:var(--gold);color:var(--navy-deep);font-size:12px;font-weight:800;
+}
+
+/* ---------- خانة رقم الواتساب (مصر +20) ---------- */
+.bc-phone{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:8px;}
+.bc-phone select,.bc-phone input{
+  width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--r-s);
+  background:var(--paper);font:inherit;font-size:15px;
+}
+.bc-phone input{text-align:start;}
+.bc-phone-hint{display:block;margin-top:8px;font-weight:600;line-height:1.6;}
+.bc-phone-hint.ok{color:var(--teal-dark);}
+.bc-phone-hint.bad{color:var(--danger);}
+
+/* ---------- موبايل وتابلت ---------- */
+@media (max-width:860px){
+  .bc-split{grid-template-columns:1fr;height:calc(100dvh - 190px);min-height:440px;}
+  .bc-split .bc-thread{display:none;}
+  .bc-split.has-sel .bc-people{display:none;}
+  .bc-split.has-sel .bc-thread{display:flex;}
+  .bc-back{display:grid;}
+  .bc-panel{height:calc(100dvh - 210px);min-height:420px;}
+  .bc-msg{max-width:88%;}
+}
+@media (max-width:520px){
+  .bc-phone{grid-template-columns:1fr;}
+  .bc-composer .btn{padding-inline:14px;}
+}

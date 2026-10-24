@@ -1,22 +1,62 @@
 /* ============================================================
    🎓 StudentDashboard — لوحة تحكم الطالب
    (بيستخدم CourseCard الجديد + صور الكورسات)
+   ------------------------------------------------------------
+   جديد:
+   - 💬 تواصل مع مس شيرهان (شات خاص مع عدّاد رسايل جديدة)
+   - 👥 الجروب العام (كل الحسابات)
+   - 🌍 الكورسات العامة (is_general) بتظهر لكل الحسابات المشتركة،
+     حتى الكورسات اللي تتنزل بعد كده، من غير ما حد يعمل أي حاجة
    ============================================================ */
 import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
+import { useT } from '../i18n/useT';
+import { chatLabels } from '../i18n/chatLabels';
+import { useUnreadSupport } from '../hooks/useUnreadSupport';
 import CoursePlayer from '../components/CoursePlayer';
 import CourseCard from '../components/CourseCard';
 import SupportLinks from '../components/SupportLinks';
+import DailyChallenge from '../components/DailyChallenge';
+import Leaderboard from '../components/Leaderboard';
+import SupportChat from '../components/chat/SupportChat';
+import GroupChat from '../components/chat/GroupChat';
+
+/* كورسات مرحلة الطالب + الكورسات العامة.
+   لو عمود is_general لسه ماتضافش (ملف SQL ماتشغّلش) بنرجع للطريقة القديمة */
+async function loadCoursesFor(gradeLevelId) {
+  let query = supabase.from('courses').select('*').order('sort_order');
+  query = gradeLevelId
+    ? query.or(`grade_level_id.eq.${gradeLevelId},is_general.eq.true`)
+    : query.eq('is_general', true);
+
+  const { data, error } = await query;
+  if (!error) return data || [];
+
+  if (!gradeLevelId) return [];
+  const fallback = await supabase
+    .from('courses')
+    .select('*')
+    .eq('grade_level_id', gradeLevelId)
+    .order('sort_order');
+  return fallback.data || [];
+}
 
 function StudentDashboard() {
   const { profile, signOut } = useAuth();
+  const { lang } = useT();
+  const C = chatLabels(lang);
   const [courses, setCourses] = useState([]);
   const [lessonCounts, setLessonCounts] = useState({});
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [playerCourse, setPlayerCourse] = useState(null);
+  const [tab, setTab] = useState('courses'); /* courses | challenge | support | group */
+  const [boardKey, setBoardKey] = useState(0);
+
+  /* رسايل مس شيرهان اللي لسه ماتقرتش */
+  const { count: unread, refresh: refreshUnread } = useUnreadSupport('owner');
 
   useEffect(() => {
     async function load() {
@@ -32,27 +72,20 @@ function StudentDashboard() {
 
       setSubscription(subs?.[0] || null);
 
-      if (profile.grade_level_id) {
-        const { data: coursesData } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('grade_level_id', profile.grade_level_id)
-          .order('sort_order');
-        const list = coursesData || [];
-        setCourses(list);
+      const list = await loadCoursesFor(profile.grade_level_id);
+      setCourses(list);
 
-        /* عدد الفيديوهات في كل كورس */
-        if (list.length > 0) {
-          const { data: lessonRows } = await supabase
-            .from('lessons')
-            .select('course_id')
-            .in('course_id', list.map((c) => c.id));
-          const counts = {};
-          (lessonRows || []).forEach((l) => {
-            counts[l.course_id] = (counts[l.course_id] || 0) + 1;
-          });
-          setLessonCounts(counts);
-        }
+      /* عدد الفيديوهات في كل كورس */
+      if (list.length > 0) {
+        const { data: lessonRows } = await supabase
+          .from('lessons')
+          .select('course_id')
+          .in('course_id', list.map((c) => c.id));
+        const counts = {};
+        (lessonRows || []).forEach((l) => {
+          counts[l.course_id] = (counts[l.course_id] || 0) + 1;
+        });
+        setLessonCounts(counts);
       }
 
       setLoading(false);
@@ -68,14 +101,47 @@ function StudentDashboard() {
   const isActive = !!subscription && subscription.status === 'active' && !!endDate && endDate >= new Date();
   const daysLeft = endDate ? Math.max(0, Math.ceil((endDate - new Date()) / 86400000)) : 0;
 
+  /* الكورسات بتظهر لو الطالب له مرحلة، أو فيه كورسات عامة */
+  const hasCourseAccess = isActive && (!!profile?.grade_level_id || courses.length > 0);
+
   return (
     <div className="dash-shell">
       <aside className="sidebar">
         <div className="brand">
           <span className="mark">EN</span> بسّطنا الإنجليزي
         </div>
-        <a href="#" className="active" onClick={(e) => e.preventDefault()}>
+        <a
+          href="#"
+          className={tab === 'courses' ? 'active' : ''}
+          onClick={(e) => { e.preventDefault(); setTab('courses'); }}
+        >
           📚 كورساتي
+        </a>
+        <a
+          href="#"
+          className={tab === 'challenge' ? 'active' : ''}
+          onClick={(e) => { e.preventDefault(); setTab('challenge'); }}
+        >
+          🏆 التحدي اليومي
+        </a>
+        <a
+          href="#"
+          className={tab === 'support' ? 'active' : ''}
+          onClick={(e) => { e.preventDefault(); setTab('support'); }}
+        >
+          💬 {C.tabSupport}
+          {unread > 0 && (
+            <b className="nav-badge" aria-label={C.unreadN(unread)}>
+              {unread > 99 ? '99+' : unread}
+            </b>
+          )}
+        </a>
+        <a
+          href="#"
+          className={tab === 'group' ? 'active' : ''}
+          onClick={(e) => { e.preventDefault(); setTab('group'); }}
+        >
+          👥 {C.tabGroup}
         </a>
 
         <SupportLinks />
@@ -104,22 +170,27 @@ function StudentDashboard() {
 
         {!isActive && (
           <div className="card notice-card danger">
-            <p>⚠️ مفيش اشتراك فعّال. تواصل مع مس. شيرهان لتجديد الاشتراك.</p>
+            <p>⚠️ مفيش اشتراك فعّال. كلّم مس. شيرهان من تبويب «{C.tabSupport}» لتجديد الاشتراك.</p>
           </div>
         )}
 
         {isActive && daysLeft <= 7 && (
           <div className="card notice-card warn">
-            <p>⏳ اشتراكك هيخلص بعد {daysLeft} يوم. تواصل مع مس. شيرهان للتجديد.</p>
+            <p>⏳ اشتراكك هيخلص بعد {daysLeft} يوم. كلّم مس. شيرهان للتجديد.</p>
           </div>
         )}
 
-        {isActive && !profile?.grade_level_id && (
+        {isActive && !loading && !profile?.grade_level_id && courses.length === 0 && (
           <div className="empty-state">محتاج تحدد مرحلتك الدراسية. تواصل مع الدعم.</div>
         )}
 
-        {isActive && profile?.grade_level_id && (
+        {tab === 'courses' && hasCourseAccess && (
           <>
+            <button type="button" className="dc-banner" onClick={() => setTab('challenge')}>
+              <span>🔥 تحدي اليوم جاهز — جاوب وكمّل الستريك</span>
+              <b>‹</b>
+            </button>
+
             <div className="search-box student-search">
               <input
                 type="text"
@@ -156,6 +227,42 @@ function StudentDashboard() {
               </div>
             )}
           </>
+        )}
+
+        {tab === 'challenge' && isActive && (
+          profile?.grade_level_id ? (
+            <div className="dc-layout">
+              <DailyChallenge onAnswered={() => setBoardKey((k) => k + 1)} />
+              <Leaderboard refreshKey={boardKey} />
+            </div>
+          ) : (
+            <div className="empty-state">محتاج تحدد مرحلتك الدراسية. تواصل مع الدعم.</div>
+          )
+        )}
+
+        {/* الشات والجروب متاحين حتى لو الاشتراك منتهي (عشان الطالب يقدر يطلب التجديد) */}
+        {tab === 'support' && profile?.id && (
+          <section className="bc-section">
+            <div className="bc-head">
+              <h2>💬 {C.studentTitle}</h2>
+              <p>{C.studentSub}</p>
+            </div>
+            <div className="bc-panel">
+              <SupportChat studentId={profile.id} viewerRole="student" onRead={refreshUnread} />
+            </div>
+          </section>
+        )}
+
+        {tab === 'group' && (
+          <section className="bc-section">
+            <div className="bc-head">
+              <h2>👥 {C.groupTitle}</h2>
+              <p>{C.groupSub}</p>
+            </div>
+            <div className="bc-panel">
+              <GroupChat />
+            </div>
+          </section>
         )}
       </main>
 

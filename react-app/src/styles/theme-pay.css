@@ -1,0 +1,107 @@
+/* ============================================================
+   theme-pay.css — الدفع بالتحويل + التحويلات والحسابات + شاشة القفل
+   حمّله بعد theme-chat.css. كل الكلاسات بتبدأ بـ bc-
+   بيعتمد على كلاسات theme-chat (bc-chips, bc-state, bc-panel, nav-badge)
+   ============================================================ */
+
+/* ---------- نافذة الشراء ---------- */
+.bc-pay-modal{max-width:480px;max-height:92vh;overflow-y:auto;}
+.bc-pay-tabs{display:flex;gap:6px;margin:0 0 16px;}
+.bc-pay-tabs span{
+  flex:1;text-align:center;padding:8px 6px;border-radius:999px;background:var(--paper-2);
+  color:var(--ink-soft);font-size:13.5px;font-weight:700;
+}
+.bc-pay-tabs span.on{background:var(--navy-deep);color:#fff;}
+.bc-pay-pkg{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:12px 14px;margin-bottom:6px;border-radius:var(--r-s);background:var(--paper-2);
+}
+.bc-pay-pkg strong{color:var(--navy-deep);}
+.bc-pay-price{font-weight:800;color:var(--teal-dark);}
+.bc-pay-h{margin:16px 0 6px;font-size:15px;color:var(--navy-deep);}
+.bc-pay-steps{margin:0 0 14px;padding-inline-start:20px;color:var(--ink-soft);line-height:1.8;font-size:14.5px;}
+.bc-pay-number{
+  display:grid;gap:6px;padding:14px;margin-bottom:8px;text-align:center;
+  border:2px dashed var(--gold);border-radius:var(--r-m);background:#FFFDF6;
+}
+.bc-pay-number small{color:var(--ink-soft);font-weight:700;}
+.bc-pay-numrow{display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;}
+.bc-pay-num{font-size:clamp(22px,6vw,28px);font-weight:800;letter-spacing:.04em;color:var(--navy-deep);}
+.bc-pay-missing{color:var(--danger);font-weight:700;}
+.bc-pay-holder{margin:0 0 6px;text-align:center;color:var(--ink-soft);}
+.bc-pay-note{margin:0 0 14px;text-align:center;color:var(--ink-soft);font-size:14px;}
+.bc-pay-hint{display:block;margin-top:6px;color:var(--ink-soft);font-size:13px;}
+.bc-pay-actions{display:flex;gap:10px;justify-content:space-between;margin-top:14px;}
+.bc-pay-actions .btn-gold{flex:1;}
+.bc-pay-result{padding:10px 0 4px;text-align:center;}
+.bc-pay-result strong{display:block;margin-bottom:6px;font-size:18px;color:var(--navy-deep);}
+.bc-pay-result p{margin:0 0 14px;color:var(--ink-soft);}
+
+/* اختيار صورة التحويل */
+.bc-file{
+  display:grid;place-items:center;gap:6px;min-height:120px;padding:12px;cursor:pointer;text-align:center;
+  border:2px dashed var(--line);border-radius:var(--r-m);background:var(--paper);color:var(--ink-soft);font-weight:700;
+}
+.bc-file:hover{border-color:var(--teal);}
+.bc-file img{max-width:100%;max-height:220px;border-radius:10px;object-fit:contain;}
+.bc-file em{font-style:normal;font-size:13px;color:var(--teal-dark);}
+.bc-file-input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
+.bc-file-input:focus-visible + .bc-pay-hint{outline:2px solid var(--gold);outline-offset:2px;}
+
+/* ---------- لوحة الأونر: بيانات التحويل ---------- */
+.bc-pay-settings{margin-bottom:18px;}
+.bc-pay-settings h3{margin:0 0 12px;font-size:17px;color:var(--navy-deep);}
+.bc-pay-settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.bc-pay-saved{margin-inline-start:12px;font-weight:700;font-size:14px;}
+.bc-pay-saved.ok{color:var(--teal-dark);}
+.bc-pay-saved.error{color:var(--danger);}
+.bc-pay-tabs-bar{margin:6px 0 14px;}
+
+/* ---------- طلبات التحويل ---------- */
+.bc-req-list,.bc-acc-list{list-style:none;margin:14px 0 0;padding:0;display:grid;gap:12px;}
+.bc-req{display:grid;grid-template-columns:110px 1fr auto;gap:14px;align-items:start;padding:14px;}
+.bc-req-thumb{
+  width:110px;height:110px;padding:0;overflow:hidden;cursor:pointer;display:grid;place-items:center;
+  border:1px solid var(--line);border-radius:12px;background:var(--paper-2);color:var(--ink-soft);font-size:13px;
+}
+.bc-req-thumb:disabled{cursor:default;}
+.bc-req-thumb img{width:100%;height:100%;object-fit:cover;}
+.bc-req-body{display:grid;gap:6px;min-width:0;}
+.bc-req-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.bc-req-top strong{color:var(--navy-deep);font-size:16px;}
+.bc-req-meta{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--ink-soft);font-size:14px;}
+.bc-req-meta a{color:var(--teal-dark);font-weight:700;text-decoration:underline;}
+.bc-req-note{margin:0;color:var(--danger);font-size:14px;}
+.bc-req-actions{display:grid;gap:8px;}
+.badge.bc-st-pending{background:#FFF3D6;color:#8A6410;}
+.badge.bc-st-approved{background:#E4F2EC;color:var(--teal-dark);}
+.badge.bc-st-rejected{background:#FBE7E2;color:var(--danger);}
+
+/* قفل الحسابات */
+.bc-acc-search{margin:14px 0 0;max-width:420px;}
+.bc-acc{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;}
+.bc-acc-id{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-width:0;}
+.bc-acc-id strong{color:var(--navy-deep);}
+
+/* عرض صورة التحويل كبيرة */
+.bc-lightbox{
+  display:grid;gap:10px;max-width:min(92vw,720px);max-height:92vh;padding:12px;
+  background:#fff;border-radius:var(--r-m);box-shadow:var(--sh-2);
+}
+.bc-lightbox img{max-width:100%;max-height:74vh;object-fit:contain;margin:0 auto;border-radius:10px;}
+.bc-lightbox-bar{display:flex;justify-content:space-between;gap:10px;}
+
+/* ---------- شاشة الحساب المقفول ---------- */
+.bc-locked-screen{min-height:100dvh;display:grid;place-items:center;padding:20px;background:var(--paper);}
+.bc-locked-card{display:grid;gap:14px;width:min(100%,640px);text-align:center;}
+.bc-locked-card h1{margin:0;font-size:clamp(22px,4vw,28px);color:var(--navy-deep);}
+.bc-locked-card p{margin:0 auto;color:var(--ink-soft);}
+.bc-locked-card .bc-panel{height:380px;text-align:start;}
+
+@media (max-width:640px){
+  .bc-pay-settings-grid{grid-template-columns:1fr;}
+  .bc-req{grid-template-columns:90px 1fr;}
+  .bc-req-thumb{width:90px;height:90px;}
+  .bc-req-actions{grid-column:1 / -1;grid-template-columns:1fr 1fr;}
+  .bc-acc{flex-direction:column;align-items:stretch;}
+}

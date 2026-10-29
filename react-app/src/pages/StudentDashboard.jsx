@@ -7,12 +7,15 @@
    - 👥 الجروب العام (كل الحسابات)
    - 🌍 الكورسات العامة (is_general) بتظهر لكل الحسابات المشتركة،
      حتى الكورسات اللي تتنزل بعد كده، من غير ما حد يعمل أي حاجة
+   - 💳 حالة التحويل (قيد المراجعة / مرفوض) وزرار رفع صورة التحويل
+   - 🔒 الحساب المقفول بيشوف شاشة قفل + شات الدعم بس
    ============================================================ */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useT } from '../i18n/useT';
 import { chatLabels } from '../i18n/chatLabels';
+import { payLabels } from '../i18n/payLabels';
 import { useUnreadSupport } from '../hooks/useUnreadSupport';
 import CoursePlayer from '../components/CoursePlayer';
 import CourseCard from '../components/CourseCard';
@@ -21,6 +24,7 @@ import DailyChallenge from '../components/DailyChallenge';
 import Leaderboard from '../components/Leaderboard';
 import SupportChat from '../components/chat/SupportChat';
 import GroupChat from '../components/chat/GroupChat';
+import PurchaseModal from '../components/payments/PurchaseModal';
 
 /* كورسات مرحلة الطالب + الكورسات العامة.
    لو عمود is_general لسه ماتضافش (ملف SQL ماتشغّلش) بنرجع للطريقة القديمة */
@@ -46,6 +50,7 @@ function StudentDashboard() {
   const { profile, signOut } = useAuth();
   const { lang } = useT();
   const C = chatLabels(lang);
+  const P = payLabels(lang);
   const [courses, setCourses] = useState([]);
   const [lessonCounts, setLessonCounts] = useState({});
   const [subscription, setSubscription] = useState(null);
@@ -54,14 +59,32 @@ function StudentDashboard() {
   const [playerCourse, setPlayerCourse] = useState(null);
   const [tab, setTab] = useState('courses'); /* courses | challenge | support | group */
   const [boardKey, setBoardKey] = useState(0);
+  const [locked, setLocked] = useState(false);
+  const [payReq, setPayReq] = useState(null); /* آخر طلب تحويل */
+  const [showPay, setShowPay] = useState(false);
 
   /* رسايل مس شيرهان اللي لسه ماتقرتش */
   const { count: unread, refresh: refreshUnread } = useUnreadSupport('owner');
 
-  useEffect(() => {
-    async function load() {
+  const load = useCallback(async (silent = false) => {
       if (!profile) return;
-      setLoading(true);
+      if (!silent) setLoading(true);
+
+      /* قفل الحساب + آخر طلب تحويل */
+      const { data: lk } = await supabase
+        .from('profiles')
+        .select('is_locked')
+        .eq('id', profile.id)
+        .maybeSingle();
+      setLocked(!!(lk && lk.is_locked));
+
+      const { data: pr } = await supabase
+        .from('payment_requests')
+        .select('id,status,admin_note,package_name,created_at')
+        .eq('user_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(1);
+      setPayReq((pr && pr[0]) || null);
 
       const { data: subs } = await supabase
         .from('subscriptions')
@@ -89,9 +112,11 @@ function StudentDashboard() {
       }
 
       setLoading(false);
-    }
-    load();
   }, [profile]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const filteredCourses = courses.filter((c) =>
     (c.title_ar || '').toLowerCase().includes(search.toLowerCase())
@@ -103,6 +128,31 @@ function StudentDashboard() {
 
   /* الكورسات بتظهر لو الطالب له مرحلة، أو فيه كورسات عامة */
   const hasCourseAccess = isActive && (!!profile?.grade_level_id || courses.length > 0);
+
+  /* لو التحويل قيد المراجعة، نحدّث الحالة لوحدها (أول ما مس شيرهان تفعّل يظهر المحتوى) */
+  useEffect(() => {
+    if (isActive || !payReq || payReq.status !== 'pending') return undefined;
+    const timer = setInterval(() => load(true), 25000);
+    return () => clearInterval(timer);
+  }, [isActive, payReq, load]);
+
+  /* حساب مقفول: شاشة قفل + شات الدعم بس */
+  if (locked && profile) {
+    return (
+      <div className="bc-locked-screen">
+        <div className="card bc-locked-card">
+          <h1>🔒 {P.lockedTitle}</h1>
+          <p>{P.lockedText}</p>
+          <div className="bc-panel">
+            <SupportChat studentId={profile.id} viewerRole="student" onRead={refreshUnread} />
+          </div>
+          <button type="button" className="btn btn-ghost" onClick={signOut}>
+            {P.logout}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dash-shell">
@@ -168,9 +218,24 @@ function StudentDashboard() {
           </span>
         </div>
 
-        {!isActive && (
+        {!isActive && payReq && payReq.status === 'pending' && (
+          <div className="card notice-card warn">
+            <p>{P.pendingText(payReq.package_name)}</p>
+          </div>
+        )}
+
+        {!isActive && !(payReq && payReq.status === 'pending') && (
           <div className="card notice-card danger">
             <p>⚠️ مفيش اشتراك فعّال. كلّم مس. شيرهان من تبويب «{C.tabSupport}» لتجديد الاشتراك.</p>
+            {payReq && payReq.status === 'rejected' && (
+              <p>
+                {P.rejectedText}
+                {payReq.admin_note ? ` ${P.rejectedNote}: ${payReq.admin_note}` : ''}
+              </p>
+            )}
+            <button type="button" className="btn btn-gold btn-sm" onClick={() => setShowPay(true)}>
+              {payReq && payReq.status === 'rejected' ? P.uploadAgainBtn : P.uploadBtn}
+            </button>
           </div>
         )}
 
@@ -268,6 +333,10 @@ function StudentDashboard() {
 
       {playerCourse && (
         <CoursePlayer course={playerCourse} onClose={() => setPlayerCourse(null)} />
+      )}
+
+      {showPay && (
+        <PurchaseModal defaultLevelId={profile?.grade_level_id} onClose={() => setShowPay(false)} />
       )}
     </div>
   );

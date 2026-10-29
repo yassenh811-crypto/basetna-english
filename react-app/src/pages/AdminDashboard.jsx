@@ -1,110 +1,97 @@
 /* ============================================================
-   👑 AdminDashboard — لوحة تحكم الأدمن
+   👑 AdminDashboard — لوحة تحكم الأدمن (عربي / English)
    ------------------------------------------------------------
-   - كل صفحة ليها رابط خاص (/admin/courses ...) فالريفرش والرجوع بيشتغلوا
-   - مين يشوف إيه بيتحدد من القايمة NAV تحت (roles)
-   - الصفحات: نظرة عامة، المراحل، الكورسات، الباقات، الطلاب والاشتراكات،
-              التحدي اليومي، الإعدادات
+   جديد:
+   - 💬 الدعم والمحادثات: الأونر يكلّم أي طالب (مع عدّاد رسايل جديدة)
+   - 👥 الجروب العام: كل الحسابات في مكان واحد
+   - 💳 التحويلات والحسابات: رقم التحويل، صور الإيصالات، تفعيل الاشتراك،
+     وقفل/فتح الحسابات (مع عدّاد التحويلات الجديدة)
+   باقي التابات زي ما هي بالظبط.
    ============================================================ */
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
-import SupportLinks from '../components/SupportLinks';
-
+import { useT } from '../i18n/useT';
+import { chatLabels } from '../i18n/chatLabels';
+import { payLabels } from '../i18n/payLabels';
+import { useUnreadSupport } from '../hooks/useUnreadSupport';
+import { usePendingPayments } from '../hooks/usePendingPayments';
 import AdminOverview from '../components/admin/AdminOverview';
 import AdminLevels from '../components/admin/AdminLevels';
 import AdminCourses from '../components/admin/AdminCourses';
 import AdminPackages from '../components/admin/AdminPackages';
 import AdminStudents from '../components/admin/AdminStudents';
-import AdminDaily from '../components/admin/AdminDaily';
+import AdminSupport from '../components/admin/AdminSupport';
+import AdminGroup from '../components/admin/AdminGroup';
+import AdminPayments from '../components/admin/AdminPayments';
 import AdminSettings from '../components/admin/AdminSettings';
-
-const ALL = ['superadmin', 'owner', 'support'];
-const MANAGERS = ['superadmin', 'owner'];
-
-/* ✏️ عدّل roles هنا لو عايز تغيّر مين يشوف كل صفحة */
-const NAV = [
-  { path: '', end: true, icon: '📊', label: 'نظرة عامة', roles: ALL },
-  { path: 'levels', icon: '📚', label: 'المراحل الدراسية', roles: MANAGERS },
-  { path: 'courses', icon: '🎬', label: 'الكورسات', roles: MANAGERS },
-  { path: 'packages', icon: '🎁', label: 'الباقات', roles: MANAGERS },
-  { path: 'students', icon: '👩‍🎓', label: 'الطلاب والاشتراكات', roles: ALL },
-  { path: 'daily', icon: '🔥', label: 'التحدي اليومي', roles: MANAGERS },
-  { path: 'settings', icon: '⚙️', label: 'الإعدادات', roles: MANAGERS },
-];
-
-const ROLE_BADGE = {
-  superadmin: { cls: 'superadmin', text: '👑 مدير أعلى' },
-  owner: { cls: '', text: '👩‍🏫 ميس' },
-  support: { cls: 'support', text: '🛠️ دعم فني' },
-};
-
-/* لو حد دخل صفحة مش من صلاحياته يرجع للنظرة العامة */
-function Guard({ roles, role, children }) {
-  return roles.includes(role) ? children : <Navigate to="/admin" replace />;
-}
 
 function AdminDashboard() {
   const { profile, signOut } = useAuth();
-  const { lang, toggleLanguage, theme, toggleTheme } = useUI();
+  const { toggleLanguage } = useUI();
+  const { t, lang } = useT();
+  const C = chatLabels(lang);
+  const P = payLabels(lang);
+  const [tab, setTab] = useState('overview');
 
-  const role = profile?.role;
-  const badge = ROLE_BADGE[role];
-  const guard = (path, el) => (
-    <Guard roles={NAV.find((n) => n.path === path).roles} role={role}>{el}</Guard>
-  );
+  /* رسايل الطلاب اللي لسه ماتقرتش */
+  const { count: unread } = useUnreadSupport('student');
+  /* تحويلات لسه ماتراجعتش */
+  const { count: pendingPay } = usePendingPayments();
+
+  const tabs = [
+    { id: 'overview', icon: '📊', label: t('tabOverview') },
+    { id: 'levels', icon: '🪜', label: t('tabLevels') },
+    { id: 'courses', icon: '🎬', label: t('tabCourses') },
+    { id: 'packages', icon: '🎁', label: t('tabPackages') },
+    { id: 'students', icon: '👩‍🎓', label: t('tabStudents') },
+    { id: 'payments', icon: '💳', label: P.tabPayments, badge: pendingPay, badgeLabel: P.pendingN(pendingPay) },
+    { id: 'support', icon: '💬', label: C.tabSupport, badge: unread, badgeLabel: C.unreadN(unread) },
+    { id: 'group', icon: '👥', label: C.tabGroup },
+    { id: 'settings', icon: '⚙️', label: t('tabSettings') },
+  ];
 
   return (
     <div className="dash-shell">
       <aside className="sidebar">
-        <div className="brand">
-          <span className="mark">EN</span> بسّطنا الإنجليزي
-        </div>
+        <div className="brand"><span className="mark">EN</span> {t('brand')}</div>
 
-        {badge && <div className={`role-badge ${badge.cls}`}>{badge.text}</div>}
-
-        {NAV.filter((n) => n.roles.includes(role)).map((n) => (
-          <NavLink key={n.path || 'home'} to={n.path ? `/admin/${n.path}` : '/admin'} end={!!n.end}>
-            <span className="side-ico">{n.icon}</span>
-            <span>{n.label}</span>
-          </NavLink>
+        {tabs.map((x) => (
+          <a
+            key={x.id}
+            href="#"
+            className={`nav-link ${tab === x.id ? 'active' : ''}`}
+            aria-current={tab === x.id ? 'page' : undefined}
+            onClick={(e) => { e.preventDefault(); setTab(x.id); }}
+          >
+            <span aria-hidden="true">{x.icon}</span> {x.label}
+            {x.badge > 0 && (
+              <b className="nav-badge" aria-label={x.badgeLabel}>
+                {x.badge > 99 ? '99+' : x.badge}
+              </b>
+            )}
+          </a>
         ))}
 
-        <SupportLinks />
-
         <div className="side-tools">
-          <button type="button" onClick={toggleLanguage}>
-            {lang === 'ar' ? 'English' : 'العربية'} 🌐
-          </button>
-          <button type="button" onClick={toggleTheme} aria-label="تغيير المظهر" title="تغيير المظهر">
-            {theme === 'light' ? '🌙' : '☀️'}
-          </button>
+          <button type="button" onClick={toggleLanguage}>🌐 {t('langBtn')}</button>
         </div>
 
-        <a
-          href="#"
-          className="logout"
-          onClick={(e) => {
-            e.preventDefault();
-            signOut();
-          }}
-        >
-          <span className="side-ico">🚪</span>
-          <span>تسجيل الخروج</span>
+        <a href="#" className="logout" onClick={(e) => { e.preventDefault(); signOut(); }}>
+          🚪 {t('logout')}
         </a>
       </aside>
 
       <main className="dash-main">
-        <Routes>
-          <Route index element={<AdminOverview profile={profile} />} />
-          <Route path="levels" element={guard('levels', <AdminLevels />)} />
-          <Route path="courses" element={guard('courses', <AdminCourses />)} />
-          <Route path="packages" element={guard('packages', <AdminPackages />)} />
-          <Route path="students" element={guard('students', <AdminStudents />)} />
-          <Route path="daily" element={guard('daily', <AdminDaily />)} />
-          <Route path="settings" element={guard('settings', <AdminSettings />)} />
-          <Route path="*" element={<Navigate to="/admin" replace />} />
-        </Routes>
+        {tab === 'overview' && <AdminOverview profile={profile} />}
+        {tab === 'levels' && <AdminLevels />}
+        {tab === 'courses' && <AdminCourses />}
+        {tab === 'packages' && <AdminPackages />}
+        {tab === 'students' && <AdminStudents />}
+        {tab === 'payments' && <AdminPayments />}
+        {tab === 'support' && <AdminSupport />}
+        {tab === 'group' && <AdminGroup />}
+        {tab === 'settings' && <AdminSettings />}
       </main>
     </div>
   );

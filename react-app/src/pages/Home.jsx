@@ -1,22 +1,23 @@
 /* ============================================================
    🏠 Home.jsx — الصفحة الرئيسية (عربي / English)
    ------------------------------------------------------------
-   جديد:
-   - خانة كوبون اختيارية: الباقة المربوطة بكوبون بتظهر بس لما حد يدخل الكود
-   - الباقة ممكن تبقى لأكتر من مرحلة (شارات + فلتر بالمرحلة)
-   - رقم واتساب بقى بيتجاب من الإعدادات (كان رقم ثابت غلط)
+   التغييرات:
+   - شلنا الكوبونات والخصم خالص (خانة الكوبون + الباقات المربوطة بكوبون)
+   - زرار «اشترك» بيفتح نافذة الدفع بالتحويل: رقم التحويل، وبعدها الاسم
+     وصورة التحويل (إجباري). مفيش واتساب في الاشتراك.
    ============================================================ */
 import { useEffect, useMemo, useState } from 'react';
 import { getLevels, getPackages, getCourseCount } from '../services/api';
 import { supabase } from '../services/supabase';
 import { useAuth } from '../context/AuthContext';
 import { useT } from '../i18n/useT';
+import { payLabels } from '../i18n/payLabels';
 import { packageLevelIds } from '../utils/packages';
-import { useCouponPackages } from '../hooks/useCouponPackages';
-import CouponBox from '../components/CouponBox';
 import DemoVideo from '../components/DemoVideo';
+import PurchaseModal from '../components/payments/PurchaseModal';
 
-/* الباقات العامة (من غير الباقات المخفية بكوبون) */
+/* الباقات اللي بتظهر للناس.
+   (الباقات القديمة اللي كانت مخفية بكوبون لسه مخفية، احذفيها من لوحة الباقات) */
 async function loadPublicPackages() {
   const { data, error } = await supabase
     .from('packages')
@@ -25,52 +26,22 @@ async function loadPublicPackages() {
     .eq('coupon_required', false)
     .order('price', { ascending: true });
   if (!error && data) return data;
-  /* لسه ماشغلتش coupons.sql: ارجع للطريقة القديمة */
   const fallback = await getPackages();
   return (fallback || []).filter((p) => !p.coupon_required);
 }
 
-const COUPON_LABELS = {
-  ar: {
-    title: '🎟️ عندك كوبون؟',
-    optional: '(اختياري)',
-    placeholder: 'يرجى إدخال الكوبون (اختياري)',
-    apply: 'تفعيل',
-    activePrefix: '🎟️ كوبون',
-    activeSuffix: 'مفعّل',
-    cancel: 'إلغاء',
-    okOne: (p) => `✅ اتفتحت لك باقة: ${p.name_ar}`,
-    okMany: (n) => `✅ اتفتحت لك ${n} باقات`,
-    invalid: 'الكوبون ده غير صحيح أو منتهي',
-    error: 'حصلت مشكلة، جرّب تاني',
-  },
-  en: {
-    title: '🎟️ Have a coupon?',
-    optional: '(optional)',
-    placeholder: 'Enter your coupon (optional)',
-    apply: 'Apply',
-    activePrefix: '🎟️ Coupon',
-    activeSuffix: 'applied',
-    cancel: 'Remove',
-    okOne: (p) => `✅ Package unlocked: ${p.name_en || p.name_ar}`,
-    okMany: (n) => `✅ ${n} packages unlocked`,
-    invalid: 'This coupon is invalid or expired',
-    error: 'Something went wrong, please try again',
-  },
-};
-
 function Home() {
   const { setShowAuthModal, user } = useAuth();
   const { t, field, lang } = useT();
+  const P = payLabels(lang);
   const [levels, setLevels] = useState([]);
   const [packages, setPackages] = useState([]);
   const [courseCount, setCourseCount] = useState(0);
-  const [whatsapp, setWhatsapp] = useState('');
   const [demo, setDemo] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
-  const coupon = useCouponPackages();
+  const [buying, setBuying] = useState(null);
 
   useEffect(() => {
     async function loadData() {
@@ -84,7 +55,6 @@ function Home() {
         setLevels(levelsData);
         setPackages(packagesData);
         setCourseCount(count);
-        setWhatsapp(settingsRes?.data?.whatsapp_number || '');
         const s = settingsRes?.data;
         setDemo(
           s?.demo_video_url
@@ -100,39 +70,22 @@ function Home() {
     loadData();
   }, []);
 
-  const L = COUPON_LABELS[lang === 'en' ? 'en' : 'ar'];
   const allLabel = lang === 'en' ? 'All' : 'الكل';
-  const ribbon = lang === 'en' ? '🎟️ Coupon package' : '🎟️ باقة الكوبون';
 
-  const unlockedIds = useMemo(() => new Set(coupon.unlocked.map((p) => String(p.id))), [coupon.unlocked]);
   const levelById = useMemo(() => {
     const m = new Map();
     levels.forEach((lv) => m.set(String(lv.id), lv));
     return m;
   }, [levels]);
 
-  /* الباقات اللي هتظهر: المفتوحة بالكوبون + العامة، بعد البحث والفلتر */
+  /* الباقات بعد البحث والفلتر */
   const q = searchQuery.trim().toLowerCase();
   const filteredPackages = useMemo(() => {
-    const map = new Map();
-    [...coupon.unlocked, ...packages].forEach((p) => map.set(String(p.id), p));
-    let list = [...map.values()];
+    let list = [...packages];
     if (levelFilter !== 'all') list = list.filter((p) => packageLevelIds(p).includes(levelFilter));
     if (q) list = list.filter((p) => `${p.name_ar || ''} ${p.name_en || ''}`.toLowerCase().includes(q));
     return list;
-  }, [packages, coupon.unlocked, levelFilter, q]);
-
-  function subscribeViaWhatsApp(p) {
-    if (!whatsapp) {
-      alert(lang === 'en' ? '⚠️ WhatsApp number is not set yet' : '⚠️ رقم واتساب لم يُضف بعد');
-      return;
-    }
-    let text = t('waMsg', { name: field(p, 'name') });
-    if (coupon.activeCode && unlockedIds.has(String(p.id))) {
-      text += lang === 'en' ? ` (coupon ${coupon.activeCode})` : ` (كوبون ${coupon.activeCode})`;
-    }
-    window.open(`https://wa.me/${whatsapp}?text=${encodeURIComponent(text)}`, '_blank', 'noopener');
-  }
+  }, [packages, levelFilter, q]);
 
   const steps = [
     { title: t('how1'), desc: t('how1d') },
@@ -237,12 +190,9 @@ function Home() {
           <div className="section-head">
             <div>
               <h2>{t('packagesTitle')}</h2>
-              <p className="section-sub">{t('packagesSub')}</p>
+              <p className="section-sub">{P.packagesSub}</p>
             </div>
           </div>
-
-          {/* خانة الكوبون (اختياري) */}
-          <CouponBox coupon={coupon} labels={L} />
 
           <div className="search-box bt-pkg-search">
             <input
@@ -283,7 +233,6 @@ function Home() {
             ) : (
               filteredPackages.map((p) => (
                 <div className="card pkg-card" key={p.id}>
-                  {unlockedIds.has(String(p.id)) && <span className="pkg-ribbon">{ribbon}</span>}
                   <h3>{field(p, 'name')}</h3>
                   <div className="pkg-levels">
                     {packageLevelIds(p).map((id) => {
@@ -295,8 +244,8 @@ function Home() {
                     {p.price} <small>{t('priceUnit', { days: p.duration_days })}</small>
                   </div>
                   <p className="desc">{field(p, 'description')}</p>
-                  <button className="btn btn-teal btn-block" onClick={() => subscribeViaWhatsApp(p)}>
-                    {t('subscribe')}
+                  <button className="btn btn-teal btn-block" onClick={() => setBuying(p)}>
+                    {P.subscribeBtn}
                   </button>
                 </div>
               ))
@@ -304,6 +253,8 @@ function Home() {
           </div>
         </div>
       </section>
+
+      {buying && <PurchaseModal pkg={buying} levels={levels} onClose={() => setBuying(null)} />}
     </div>
   );
 }

@@ -9,6 +9,7 @@
      حتى الكورسات اللي تتنزل بعد كده، من غير ما حد يعمل أي حاجة
    - 💳 حالة التحويل (قيد المراجعة / مرفوض) وزرار رفع صورة التحويل
    - 🔒 الحساب المقفول بيشوف شاشة قفل + شات الدعم بس
+   - 🔔 إشعاراتي: تحويل اتفعّل/اترفض، رسايل مس شيرهان، مع أرشيف
    ============================================================ */
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
@@ -17,6 +18,8 @@ import { useT } from '../i18n/useT';
 import { chatLabels } from '../i18n/chatLabels';
 import { payLabels } from '../i18n/payLabels';
 import { useUnreadSupport } from '../hooks/useUnreadSupport';
+import { useUnreadNotifications } from '../hooks/useUnreadNotifications';
+import { notifLabels } from '../i18n/notifLabels';
 import CoursePlayer from '../components/CoursePlayer';
 import CourseCard from '../components/CourseCard';
 import SupportLinks from '../components/SupportLinks';
@@ -25,6 +28,7 @@ import Leaderboard from '../components/Leaderboard';
 import SupportChat from '../components/chat/SupportChat';
 import GroupChat from '../components/chat/GroupChat';
 import PurchaseModal from '../components/payments/PurchaseModal';
+import NotificationCenter from '../components/notifications/NotificationCenter';
 
 /* كورسات مرحلة الطالب + الكورسات العامة.
    لو عمود is_general لسه ماتضافش (ملف SQL ماتشغّلش) بنرجع للطريقة القديمة */
@@ -51,13 +55,14 @@ function StudentDashboard() {
   const { lang } = useT();
   const C = chatLabels(lang);
   const P = payLabels(lang);
+  const NL = notifLabels(lang);
   const [courses, setCourses] = useState([]);
   const [lessonCounts, setLessonCounts] = useState({});
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [playerCourse, setPlayerCourse] = useState(null);
-  const [tab, setTab] = useState('courses'); /* courses | challenge | support | group */
+  const [tab, setTab] = useState('courses'); /* courses | challenge | notifications | support | group */
   const [boardKey, setBoardKey] = useState(0);
   const [locked, setLocked] = useState(false);
   const [payReq, setPayReq] = useState(null); /* آخر طلب تحويل */
@@ -65,6 +70,14 @@ function StudentDashboard() {
 
   /* رسايل مس شيرهان اللي لسه ماتقرتش */
   const { count: unread, refresh: refreshUnread } = useUnreadSupport('owner');
+  /* إشعارات الطالب (الجرس) */
+  const { count: notifCount, refresh: refreshNotif } = useUnreadNotifications('user');
+
+  /* دوسة على إشعار: افتح الصفحة المرتبطة بيه */
+  function openNotification(n) {
+    if (n.type === 'message_new') setTab('support');
+    else if (n.type === 'payment_approved' || n.type === 'payment_rejected' || n.type === 'payment_submitted') setTab('courses');
+  }
 
   const load = useCallback(async (silent = false) => {
       if (!profile) return;
@@ -173,6 +186,18 @@ function StudentDashboard() {
           onClick={(e) => { e.preventDefault(); setTab('challenge'); }}
         >
           🏆 التحدي اليومي
+        </a>
+        <a
+          href="#"
+          className={tab === 'notifications' ? 'active' : ''}
+          onClick={(e) => { e.preventDefault(); setTab('notifications'); }}
+        >
+          🔔 {NL.studentTab}
+          {notifCount > 0 && (
+            <b className="nav-badge" aria-label={NL.unreadN(notifCount)}>
+              {notifCount > 99 ? '99+' : notifCount}
+            </b>
+          )}
         </a>
         <a
           href="#"
@@ -303,6 +328,16 @@ function StudentDashboard() {
           ) : (
             <div className="empty-state">محتاج تحدد مرحلتك الدراسية. تواصل مع الدعم.</div>
           )
+        )}
+
+        {tab === 'notifications' && (
+          <section className="bc-section">
+            <div className="bc-head">
+              <h2>🔔 {NL.studentTitle}</h2>
+              <p>{NL.studentSub}</p>
+            </div>
+            <NotificationCenter audience="user" onOpen={openNotification} onChanged={refreshNotif} />
+          </section>
         )}
 
         {/* الشات والجروب متاحين حتى لو الاشتراك منتهي (عشان الطالب يقدر يطلب التجديد) */}

@@ -1,0 +1,42 @@
+/* ============================================================
+   theme-notif.css — الإشعارات والأرشيف
+   حمّله بعد theme-pay.css. بيعتمد على bc-chips / bc-state / nav-badge من theme-chat
+   ============================================================ */
+.bc-notif{display:grid;gap:12px;}
+.bc-notif-tabs{margin-bottom:2px;}
+.bc-notif-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.bc-notif-bar small{color:var(--ink-soft);font-size:13px;line-height:1.6;max-width:520px;}
+.bc-notif-filters{display:grid;gap:10px;}
+.bc-notif-filters .bc-chips{flex-wrap:wrap;}
+.bc-notif-filters .search-box{margin:0;max-width:420px;}
+.bc-notif-more{text-align:center;padding:6px 0 2px;}
+
+.bc-n-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;}
+.bc-n{
+  display:flex;align-items:stretch;gap:8px;
+  background:#fff;border:1px solid var(--line);border-radius:var(--r-m);
+  border-inline-start:4px solid transparent;box-shadow:var(--sh-1);
+}
+.bc-n.new{border-inline-start-color:var(--gold);background:#FFFDF6;}
+.bc-n-main{
+  flex:1;min-width:0;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;
+  padding:12px 14px;background:none;border:0;cursor:pointer;text-align:start;font:inherit;color:inherit;
+}
+.bc-n-main:hover{background:rgba(201,154,59,.07);}
+.bc-n-ico{font-size:22px;line-height:1;}
+.bc-n-text{display:grid;gap:2px;min-width:0;}
+.bc-n-text strong{color:var(--navy-deep);font-size:15.5px;overflow-wrap:anywhere;}
+.bc-n:not(.new) .bc-n-text strong{font-weight:600;color:var(--ink-soft);}
+.bc-n-text span{color:var(--ink-soft);font-size:14px;overflow-wrap:anywhere;}
+.bc-n-time{color:var(--ink-soft);font-size:12.5px;white-space:nowrap;}
+.bc-n-check{
+  align-self:center;margin-inline-end:10px;width:34px;height:34px;flex-shrink:0;border-radius:10px;
+  border:1px solid var(--line);background:var(--paper-2);color:var(--teal-dark);
+  font-size:16px;font-weight:800;cursor:pointer;
+}
+.bc-n-check:hover{background:var(--teal);color:#fff;border-color:var(--teal);}
+
+@media (max-width:520px){
+  .bc-n-main{grid-template-columns:auto 1fr;}
+  .bc-n-time{grid-column:2;}
+}

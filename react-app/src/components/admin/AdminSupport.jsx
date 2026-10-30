@@ -21,7 +21,7 @@ function isStudentRow(row, meId) {
   return true;
 }
 
-function AdminSupport() {
+function AdminSupport({ initialStudentId = null }) {
   const { profile: me } = useAuth();
   const meId = me ? me.id : null;
   const { lang } = useT();
@@ -36,6 +36,11 @@ function AdminSupport() {
   const [loading, setLoading] = useState(true);
   const [schemaError, setSchemaError] = useState(false);
   const debounceRef = useRef(null);
+
+  /* لو جاي من إشعار رسالة، افتح محادثة الطالب ده على طول */
+  useEffect(() => {
+    if (initialStudentId) setSelectedId(initialStudentId);
+  }, [initialStudentId]);
 
   const load = useCallback(async () => {
     const [stRes, msgRes] = await Promise.all([

@@ -6,6 +6,7 @@
    - 👥 الجروب العام: كل الحسابات في مكان واحد
    - 💳 التحويلات والحسابات: رقم التحويل، صور الإيصالات، تفعيل الاشتراك،
      وقفل/فتح الحسابات (مع عدّاد التحويلات الجديدة)
+   - 🔔 الإشعارات والأرشيف: كل اللي بيحصل، والمقروء بيختفي من «الجديد»
    باقي التابات زي ما هي بالظبط.
    ============================================================ */
 import { useState } from 'react';
@@ -16,6 +17,8 @@ import { chatLabels } from '../i18n/chatLabels';
 import { payLabels } from '../i18n/payLabels';
 import { useUnreadSupport } from '../hooks/useUnreadSupport';
 import { usePendingPayments } from '../hooks/usePendingPayments';
+import { useUnreadNotifications } from '../hooks/useUnreadNotifications';
+import { notifLabels } from '../i18n/notifLabels';
 import AdminOverview from '../components/admin/AdminOverview';
 import AdminLevels from '../components/admin/AdminLevels';
 import AdminCourses from '../components/admin/AdminCourses';
@@ -24,6 +27,7 @@ import AdminStudents from '../components/admin/AdminStudents';
 import AdminSupport from '../components/admin/AdminSupport';
 import AdminGroup from '../components/admin/AdminGroup';
 import AdminPayments from '../components/admin/AdminPayments';
+import AdminNotifications from '../components/admin/AdminNotifications';
 import AdminSettings from '../components/admin/AdminSettings';
 
 function AdminDashboard() {
@@ -32,15 +36,26 @@ function AdminDashboard() {
   const { t, lang } = useT();
   const C = chatLabels(lang);
   const P = payLabels(lang);
+  const NL = notifLabels(lang);
   const [tab, setTab] = useState('overview');
+  const [focusStudent, setFocusStudent] = useState(null);
 
   /* رسايل الطلاب اللي لسه ماتقرتش */
   const { count: unread } = useUnreadSupport('student');
   /* تحويلات لسه ماتراجعتش */
   const { count: pendingPay } = usePendingPayments();
+  /* إشعارات جديدة (الجرس) */
+  const { count: notifCount, refresh: refreshNotif } = useUnreadNotifications('admin');
+
+  /* دوسة على إشعار: افتح الصفحة المرتبطة بيه (ولو رسالة، افتح محادثة الطالب) */
+  function goTo(tabId, n) {
+    if (tabId === 'support' && n && n.ref_id) setFocusStudent(n.ref_id);
+    setTab(tabId);
+  }
 
   const tabs = [
     { id: 'overview', icon: '📊', label: t('tabOverview') },
+    { id: 'notifications', icon: '🔔', label: NL.tab, badge: notifCount, badgeLabel: NL.unreadN(notifCount) },
     { id: 'levels', icon: '🪜', label: t('tabLevels') },
     { id: 'courses', icon: '🎬', label: t('tabCourses') },
     { id: 'packages', icon: '🎁', label: t('tabPackages') },
@@ -89,7 +104,8 @@ function AdminDashboard() {
         {tab === 'packages' && <AdminPackages />}
         {tab === 'students' && <AdminStudents />}
         {tab === 'payments' && <AdminPayments />}
-        {tab === 'support' && <AdminSupport />}
+        {tab === 'notifications' && <AdminNotifications onNavigate={goTo} onChanged={refreshNotif} />}
+        {tab === 'support' && <AdminSupport initialStudentId={focusStudent} />}
         {tab === 'group' && <AdminGroup />}
         {tab === 'settings' && <AdminSettings />}
       </main>

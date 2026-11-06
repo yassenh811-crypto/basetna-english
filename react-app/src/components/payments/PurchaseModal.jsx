@@ -1,26 +1,28 @@
 /* ============================================================
-   PurchaseModal — الاشتراك بالتحويل
+   PurchaseModal — الاشتراك بالتحويل (من غير ما الطالب يعمل حساب)
    1) بيظهر رقم التحويل وسعر الباقة
-   2) الطالب يكتب اسمه ويرفع صورة التحويل (إجباري)
-      - زائر جديد: بيتعمله حساب + طلب تحويل
-      - طالب مسجّل دخول: بيتبعت طلب التحويل بس
+   2) الطالب يكتب اسمه بس ويرفع صورة التحويل (إجباري)
+   3) بيطلع له كود. مس شيرهان بتشوف الاسم والكود والصورة، وتعمل له الحساب بنفسها
    الاستخدام:
-     <PurchaseModal pkg={باقة} levels={المراحل} onClose={...} />   // من الصفحة الرئيسية
-     <PurchaseModal levels={[]} defaultLevelId={...} onClose={...} /> // من لوحة الطالب (بيختار الباقة)
+     <PurchaseModal pkg={باقة} onClose={...} />   // من الصفحة الرئيسية
+     <PurchaseModal onClose={...} />               // من لوحة الطالب (بيختار الباقة)
    ============================================================ */
-import { useEffect, useMemo, useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
+import { useEffect, useState } from 'react';
 import { supabase } from '../../services/supabase';
-import { getLevels } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useT } from '../../i18n/useT';
 import { payLabels } from '../../i18n/payLabels';
-import { packageLevelIds } from '../../utils/packages';
 import { usePaymentSettings } from '../../hooks/usePaymentSettings';
 
 const MAX_MB = 5;
 const OK_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const NO_LEVELS = [];
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; /* من غير 0/O و1/I عشان ماتتلخبطش */
+
+function makeCode() {
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
+  return `BT-${Array.from(bytes, (b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('')}`;
+}
 
 function extOf(file) {
   if (file.type === 'image/png') return 'png';
@@ -28,8 +30,15 @@ function extOf(file) {
   return 'jpg';
 }
 
-function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLevelId = '', onClose }) {
-  const { user } = useAuth();
+function waDigits(phone) {
+  let d = String(phone || '').replace(/\D/g, '');
+  if (d.startsWith('00')) d = d.slice(2);
+  else if (d.startsWith('0')) d = `20${d.slice(1)}`;
+  return d;
+}
+
+function PurchaseModal({ pkg = null, onClose }) {
+  const { user, profile } = useAuth();
   const { lang, field } = useT();
   const P = payLabels(lang);
   const pay = usePaymentSettings();
@@ -37,20 +46,14 @@ function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLeve
   const [step, setStep] = useState(1);
   const [packages, setPackages] = useState([]);
   const [chosenId, setChosenId] = useState(pkg ? String(pkg.id) : '');
-  const [levels, setLevels] = useState(levelsProp);
-  const [form, setForm] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    password: '',
-    levelId: defaultLevelId ? String(defaultLevelId) : '',
-  });
+  const [name, setName] = useState((profile && profile.full_name) || '');
+  const [trap, setTrap] = useState(''); /* خانة مخفية: لو اتملت يبقى بوت */
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [copied, setCopied] = useState(false);
-  const [outcome, setOutcome] = useState(''); /* '' | 'done' | 'confirm' */
+  const [copied, setCopied] = useState('');
+  const [result, setResult] = useState(null); /* { code, name, pkgName } */
 
   /* من لوحة الطالب: نجيب الباقات المتاحة (من غير باقات الكوبون المخفية) */
   useEffect(() => {
@@ -72,32 +75,13 @@ function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLeve
     };
   }, [pkg]);
 
-  useEffect(() => {
-    if (levelsProp.length) return undefined;
-    let alive = true;
-    getLevels()
-      .then((list) => {
-        if (alive) setLevels(list || []);
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [levelsProp]);
-
   const chosen = pkg || packages.find((p) => String(p.id) === chosenId) || null;
+  const chosenName = chosen ? field(chosen, 'name') : '';
 
-  /* لو الباقة محدّدة لمراحل معينة، نعرض المراحل دي بس */
-  const levelOptions = useMemo(() => {
-    const allowed = chosen ? packageLevelIds(chosen) : [];
-    return allowed.length ? levels.filter((l) => allowed.includes(String(l.id))) : levels;
-  }, [chosen, levels]);
-
+  /* اسم الطالب لو اتحمّل بعد فتح النافذة */
   useEffect(() => {
-    if (levelOptions.length === 1) {
-      setForm((f) => ({ ...f, levelId: String(levelOptions[0].id) }));
-    }
-  }, [levelOptions]);
+    if (profile && profile.full_name) setName((prev) => prev || profile.full_name);
+  }, [profile]);
 
   /* معاينة الصورة */
   useEffect(() => {
@@ -110,18 +94,22 @@ function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLeve
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  function close() {
+    if (busy) return;
+    /* الطالب المسجّل: ريفريش عشان لوحته تظهر حالة الطلب */
+    if (result && user) window.location.reload();
+    else onClose();
+  }
+
   /* Esc يقفل النافذة */
   useEffect(() => {
     function onKey(e) {
-      if (e.key === 'Escape' && !busy) onClose();
+      if (e.key === 'Escape') close();
     }
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [busy, onClose]);
-
-  function setField(key, value) {
-    setForm((f) => ({ ...f, [key]: value }));
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [busy, result, user]);
 
   function onFile(e) {
     const f = e.target.files && e.target.files[0];
@@ -140,11 +128,11 @@ function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLeve
     setFile(f);
   }
 
-  async function copyNumber() {
+  async function copy(text, key) {
     try {
-      await navigator.clipboard.writeText(pay.number);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(''), 1800);
     } catch (e) {
       /* لو المتصفح منع النسخ الطالب يقدر ينسخ بإيده */
     }
@@ -154,89 +142,61 @@ function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLeve
     e.preventDefault();
     setError('');
 
-    const name = form.name.trim();
+    const fullName = name.trim();
     if (!chosen) return setError(P.errPackage);
-    if (!name) return setError(P.errName);
-    if (!user) {
-      if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) return setError(P.errEmail);
-      if (form.password.length < 6) return setError(P.errPassword);
-    }
-    if (levelOptions.length > 0 && !form.levelId) return setError(P.errLevel);
+    if (fullName.length < 2) return setError(P.errName);
     if (!file) return setError(P.errReceipt);
+
+    /* بوت: نرجّع نجاح وهمي من غير ما نحفظ حاجة */
+    if (trap) {
+      setResult({ code: makeCode(), name: fullName, pkgName: chosenName });
+      return;
+    }
 
     setBusy(true);
     try {
-      let client = supabase;
-      let uid = user ? user.id : null;
-      let creds = null;
+      const uid = user ? user.id : null;
+      const unique = crypto.randomUUID();
+      const path = uid ? `${uid}/${unique}.${extOf(file)}` : `incoming/${unique}.${extOf(file)}`;
 
-      if (!user) {
-        /* عميل مؤقت: بيعمل الحساب ويرفع الصورة من غير ما يغيّر جلسة الموقع
-           لحد ما كل حاجة تخلص، وبعدها بنسجّل الدخول. */
-        const url = supabase.supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
-        const key = supabase.supabaseKey || import.meta.env.VITE_SUPABASE_ANON_KEY;
-        client = createClient(url, key, {
-          auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-            detectSessionInUrl: false,
-            storageKey: `bt-temp-${Date.now()}`,
-          },
-        });
-
-        const email = form.email.trim();
-        const { data, error: signErr } = await client.auth.signUp({
-          email,
-          password: form.password,
-          options: { data: { full_name: name, phone: form.phone.trim() } },
-        });
-        if (signErr) {
-          throw new Error(/registered|exists/i.test(signErr.message) ? P.errExists : signErr.message);
-        }
-        if (!data.session) {
-          /* تأكيد الإيميل شغّال: مفيش جلسة عشان نرفع الصورة دلوقتي */
-          setOutcome('confirm');
-          setBusy(false);
-          return;
-        }
-        uid = data.user.id;
-        creds = { email, password: form.password };
-
-        /* لو التطبيق عندك بيعمل صف profiles تلقائيًا ده مش هيعمل حاجة */
-        await client
-          .from('profiles')
-          .upsert({ id: uid, full_name: name }, { onConflict: 'id', ignoreDuplicates: true });
-      }
-
-      const path = `${uid}/${Date.now()}.${extOf(file)}`;
-      const up = await client.storage.from('receipts').upload(path, file, { contentType: file.type });
+      const up = await supabase.storage.from('receipts').upload(path, file, { contentType: file.type });
       if (up.error) throw new Error(`${P.errUpload}: ${up.error.message}`);
 
-      const ins = await client.from('payment_requests').insert({
-        user_id: uid,
-        full_name: name,
-        phone: form.phone.trim() || null,
-        package_id: chosen.id,
-        package_name: chosen.name_ar || chosen.name_en || '',
-        amount: chosen.price,
-        grade_level_id: form.levelId || null,
-        receipt_path: path,
-      });
-      if (ins.error) throw new Error(ins.error.message);
+      let code = makeCode();
+      let saved = false;
+      for (let attempt = 0; attempt < 4 && !saved; attempt += 1) {
+        const ins = await supabase.from('payment_requests').insert({
+          user_id: uid,
+          full_name: fullName,
+          package_id: chosen.id,
+          package_name: chosen.name_ar || chosen.name_en || '',
+          amount: chosen.price,
+          receipt_path: path,
+          code,
+        });
+        if (!ins.error) {
+          saved = true;
+        } else if (ins.error.code === '23505') {
+          code = makeCode(); /* الكود اتكرر (نادر جدًا)، نجرّب غيره */
+        } else {
+          throw new Error(ins.error.message);
+        }
+      }
+      if (!saved) throw new Error(P.errUpload);
 
-      setOutcome('done');
-      setBusy(false);
-      /* ريفريش نضيف عشان لوحة الطالب تظهر حالة الطلب */
-      setTimeout(() => window.location.reload(), 2200);
-
-      if (creds) await supabase.auth.signInWithPassword(creds);
+      setResult({ code, name: fullName, pkgName: chosen.name_ar || chosen.name_en || '' });
     } catch (err) {
       setError(err.message || String(err));
+    } finally {
       setBusy(false);
     }
   }
 
-  const chosenName = chosen ? field(chosen, 'name') : '';
+  const waNumber = waDigits(pay.whatsapp);
+  const waHref =
+    result && waNumber
+      ? `https://wa.me/${waNumber}?text=${encodeURIComponent(P.waRequestMsg(result.name, result.code, result.pkgName))}`
+      : '';
 
   return (
     <div
@@ -245,33 +205,45 @@ function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLeve
       aria-modal="true"
       aria-labelledby="bc-pay-title"
       onMouseDown={(e) => {
-        if (e.target === e.currentTarget && !busy) onClose();
+        if (e.target === e.currentTarget) close();
       }}
     >
       <div className="modal bc-pay-modal">
-        <button type="button" className="close" onClick={onClose} aria-label={P.close} disabled={busy}>
+        <button type="button" className="close" onClick={close} aria-label={P.close} disabled={busy}>
           ✕
         </button>
         <h3 id="bc-pay-title">{P.buyTitle}</h3>
 
-        {outcome === 'done' && (
+        {result && (
           <div className="bc-pay-result">
             <strong>{P.doneTitle}</strong>
-            <p>{P.doneText}</p>
-          </div>
-        )}
+            <p>{P.doneWait}</p>
 
-        {outcome === 'confirm' && (
-          <div className="bc-pay-result">
-            <strong>{P.confirmTitle}</strong>
-            <p>{P.confirmText}</p>
-            <button type="button" className="btn btn-gold btn-block" onClick={onClose}>
+            <div className="bc-pay-number">
+              <small>{P.codeTitle}</small>
+              <div className="bc-pay-numrow">
+                <bdi dir="ltr" className="bc-pay-num">
+                  {result.code}
+                </bdi>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => copy(result.code, 'code')}>
+                  {copied === 'code' ? P.copied : P.codeCopy}
+                </button>
+              </div>
+            </div>
+            <p className="bc-pay-note">{P.codeHint}</p>
+
+            {waHref && (
+              <a className="btn btn-gold btn-block" href={waHref} target="_blank" rel="noopener noreferrer">
+                {P.sendCodeWa}
+              </a>
+            )}
+            <button type="button" className="btn btn-ghost btn-block" style={{ marginTop: 10 }} onClick={close}>
               {P.close}
             </button>
           </div>
         )}
 
-        {!outcome && (
+        {!result && (
           <>
             <div className="bc-pay-tabs" aria-hidden="true">
               <span className={step === 1 ? 'on' : ''}>{P.stepPay}</span>
@@ -316,8 +288,8 @@ function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLeve
                       <bdi dir="ltr" className="bc-pay-num">
                         {pay.number}
                       </bdi>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={copyNumber}>
-                        {copied ? P.copied : P.copy}
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={() => copy(pay.number, 'num')}>
+                        {copied === 'num' ? P.copied : P.copy}
                       </button>
                     </div>
                   ) : (
@@ -331,12 +303,7 @@ function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLeve
                 )}
                 {pay.note && <p className="bc-pay-note">{pay.note}</p>}
 
-                <button
-                  type="button"
-                  className="btn btn-gold btn-block"
-                  disabled={!chosen}
-                  onClick={() => setStep(2)}
-                >
+                <button type="button" className="btn btn-gold btn-block" disabled={!chosen} onClick={() => setStep(2)}>
                   {P.paidNext}
                 </button>
               </div>
@@ -351,81 +318,17 @@ function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLeve
                     type="text"
                     autoComplete="name"
                     required
-                    value={form.name}
-                    onChange={(e) => setField('name', e.target.value)}
+                    minLength={2}
+                    maxLength={80}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
                   />
                 </div>
-
-                <div className="field">
-                  <label htmlFor="bc-pay-phone">{P.fPhone}</label>
-                  <input
-                    id="bc-pay-phone"
-                    type="tel"
-                    inputMode="tel"
-                    dir="ltr"
-                    autoComplete="tel"
-                    value={form.phone}
-                    onChange={(e) => setField('phone', e.target.value)}
-                  />
-                </div>
-
-                {!user && (
-                  <>
-                    <div className="field">
-                      <label htmlFor="bc-pay-email">{P.fEmail}</label>
-                      <input
-                        id="bc-pay-email"
-                        type="email"
-                        dir="ltr"
-                        autoComplete="email"
-                        required
-                        value={form.email}
-                        onChange={(e) => setField('email', e.target.value)}
-                      />
-                    </div>
-                    <div className="field">
-                      <label htmlFor="bc-pay-pass">{P.fPassword}</label>
-                      <input
-                        id="bc-pay-pass"
-                        type="password"
-                        dir="ltr"
-                        autoComplete="new-password"
-                        minLength={6}
-                        required
-                        value={form.password}
-                        onChange={(e) => setField('password', e.target.value)}
-                      />
-                    </div>
-                  </>
-                )}
-
-                {levelOptions.length > 1 && (
-                  <div className="field">
-                    <label htmlFor="bc-pay-level">{P.fLevel}</label>
-                    <select
-                      id="bc-pay-level"
-                      required
-                      value={form.levelId}
-                      onChange={(e) => setField('levelId', e.target.value)}
-                    >
-                      <option value="">{P.fLevelPick}</option>
-                      {levelOptions.map((l) => (
-                        <option key={l.id} value={String(l.id)}>
-                          {field(l, 'name')}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
 
                 <div className="field">
                   <label htmlFor="bc-pay-file">{P.fReceipt}</label>
                   <label className="bc-file" htmlFor="bc-pay-file">
-                    {preview ? (
-                      <img src={preview} alt="" />
-                    ) : (
-                      <span>📷 {P.receiptPick}</span>
-                    )}
+                    {preview ? <img src={preview} alt="" /> : <span>📷 {P.receiptPick}</span>}
                     {preview && <em>{P.receiptChange}</em>}
                   </label>
                   <input
@@ -438,6 +341,18 @@ function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLeve
                   <small className="bc-pay-hint">{P.receiptHint}</small>
                 </div>
 
+                {/* خانة مصيدة للبوتات: مخفية عن الناس */}
+                <input
+                  type="text"
+                  name="website"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  aria-hidden="true"
+                  value={trap}
+                  onChange={(e) => setTrap(e.target.value)}
+                  style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }}
+                />
+
                 {error && (
                   <div className="form-msg error" role="alert">
                     {error}
@@ -449,7 +364,7 @@ function PurchaseModal({ pkg = null, levels: levelsProp = NO_LEVELS, defaultLeve
                     {P.back}
                   </button>
                   <button type="submit" className="btn btn-gold" disabled={busy}>
-                    {busy ? P.sending : user ? P.submitExisting : P.submitNew}
+                    {busy ? P.sending : P.submitReceipt}
                   </button>
                 </div>
               </form>

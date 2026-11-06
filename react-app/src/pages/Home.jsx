@@ -1,6 +1,8 @@
 /* ============================================================
    🏠 Home.jsx — الصفحة الرئيسية (عربي / English)
    ------------------------------------------------------------
+   الشكل: نفس تركيب الموقع المرجعي (هيرو بلوحة «اللاب»، شريط الخطوات، كروت المراحل
+   برسم توضيحي، الباقات، بانر ختامي) — والمحتوى والنصوص بتاعة بسّطنا الإنجليزي.
    التغييرات:
    - شلنا الكوبونات والخصم خالص (خانة الكوبون + الباقات المربوطة بكوبون)
    - زرار «اشترك» بيفتح نافذة الدفع بالتحويل: رقم التحويل، وبعدها الاسم
@@ -42,6 +44,7 @@ function Home() {
   const [searchQuery, setSearchQuery] = useState('');
   const [levelFilter, setLevelFilter] = useState('all');
   const [buying, setBuying] = useState(null);
+  const [labPlaying, setLabPlaying] = useState(false);
 
   useEffect(() => {
     async function loadData() {
@@ -71,6 +74,16 @@ function Home() {
   }, []);
 
   const allLabel = lang === 'en' ? 'All' : 'الكل';
+  const isEn = lang === 'en';
+  const lab = {
+    top: 'THE ENGLISH LAB',
+    step: '01 / UNDERSTAND',
+    translation: isEn ? 'She has been studying English for 3 years.' : 'هي بتدرس إنجليزي بقالها 3 سنين.',
+    caption: isEn ? 'Understand the rule. Then use it.' : 'افهم القاعدة. وبعدين استخدمها.',
+    sub: 'GRAMMAR → SPEAKING → CONFIDENCE',
+    try: isEn ? 'Try it' : 'جرّب',
+  };
+  const glyphs = ['Hi!', 'Aa', 'ABC', '123'];
 
   const levelById = useMemo(() => {
     const m = new Map();
@@ -112,24 +125,43 @@ function Home() {
             </div>
           </div>
 
-          <div className="hero-visual">
-            {/* الجملة الإنجليزية دايماً LTR حتى في الصفحة العربية */}
-            <div className="bt-note">
-              <span className="bt-note-label">{t('tipLabel')}</span>
-              <p className="bt-sentence" dir="ltr" lang="en">
-                She <mark className="bt-mark">has studied</mark> English for 3 years.
-              </p>
-              <div className="bt-tags">
-                <span className="bt-tag" dir="ltr" lang="en">Present Perfect</span>
-                <span className="bt-tag" dir="ltr" lang="en">{t('tipRule')}</span>
-              </div>
-              <small className="bt-hint">{t('tipHint')}</small>
+          <div className={`hero-visual hero-lab ${labPlaying ? 'playing' : ''}`}>
+            <div className="lab-top">
+              <span>{lab.top}</span>
+              <span>{lab.step}</span>
             </div>
 
-            <div className="bt-stats">
-              <div className="bt-stat"><b>{loading ? '—' : levels.length}</b><span>{t('statLevels')}</span></div>
-              <div className="bt-stat"><b>{loading ? '—' : courseCount}</b><span>{t('statCourses')}</span></div>
-              <div className="bt-stat"><b>{loading ? '—' : packages.length}</b><span>{t('statPackages')}</span></div>
+            <div className="lab-stage">
+              {/* الجملة الإنجليزية دايماً LTR حتى في الصفحة العربية */}
+              <div className="bt-note">
+                <span className="bt-note-label">{t('tipLabel')}</span>
+                <p className="bt-sentence" dir="ltr" lang="en">
+                  She <mark className="bt-mark">has studied</mark> English for 3 years.
+                </p>
+                <div className="bt-tags">
+                  <span className="bt-tag" dir="ltr" lang="en">Present Perfect</span>
+                  <span className="bt-tag" dir="ltr" lang="en">{t('tipRule')}</span>
+                </div>
+                <small className="bt-hint">{t('tipHint')}</small>
+                <div className="bt-translation" aria-live="polite">{lab.translation}</div>
+              </div>
+
+              <div className="bt-stats">
+                <div className="bt-stat"><b>{loading ? '—' : levels.length}</b><span>{t('statLevels')}</span></div>
+                <div className="bt-stat"><b>{loading ? '—' : courseCount}</b><span>{t('statCourses')}</span></div>
+                <div className="bt-stat"><b>{loading ? '—' : packages.length}</b><span>{t('statPackages')}</span></div>
+              </div>
+            </div>
+
+            <div className="lab-bottom">
+              <span>
+                <strong>{lab.caption}</strong>
+                <br />
+                <small>{lab.sub}</small>
+              </span>
+              <button type="button" className="lab-button" onClick={() => setLabPlaying(true)}>
+                {lab.try}
+              </button>
             </div>
           </div>
         </div>
@@ -138,57 +170,74 @@ function Home() {
       {/* فيديو تجريبي (بيظهر لو الأدمن حط رابط) */}
       {demo && <DemoVideo demo={demo} lang={lang} />}
 
+      {/* شريط الخطوات (إزاي الموقع شغّال) */}
+      <div className="container" id="how">
+        <div className="track-strip">
+          {steps.map((st, i) => (
+            <div key={i}>
+              <span className="number">{String(i + 1).padStart(2, '0')} —</span>
+              <span>
+                {st.title}
+                <small>{st.desc}</small>
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* LEVELS */}
       <section className="block" id="levels">
         <div className="container">
           <div className="section-head">
             <div>
+              <div className="eyebrow">LEARNING PATHS</div>
               <h2>{t('levelsTitle')}</h2>
               <p className="section-sub">{t('levelsSub')}</p>
             </div>
+            <a className="text-btn" href="#packages">{t('seePackages')}</a>
           </div>
-          <div className="grid grid-4">
+          <div className="grid grid-3">
             {loading ? (
               <div className="empty-state" style={{ gridColumn: '1/-1' }}>{t('loading')}</div>
             ) : levels.length === 0 ? (
               <div className="empty-state" style={{ gridColumn: '1/-1' }}>{t('noLevels')}</div>
             ) : (
               levels.map((lv, i) => (
-                <div className="card level-card" key={lv.id}>
-                  <div className="lv-num">{i + 1}</div>
-                  <h3>{field(lv, 'name')}</h3>
-                  {/* الاسم باللغة التانية كعنوان فرعي */}
-                  <p className="level-alt" lang={lang === 'ar' ? 'en' : 'ar'}>
-                    {lang === 'ar' ? lv.name_en : lv.name_ar}
-                  </p>
-                </div>
+                <article className="card level-card" key={lv.id}>
+                  <div className={`level-art lv-${i % 3}`}>
+                    <div className="level-caption">
+                      <span>LEVEL {String(i + 1).padStart(2, '0')}</span>
+                      <b>{field(lv, 'name')}</b>
+                      <small>{lang === 'ar' ? lv.name_en : lv.name_ar}</small>
+                    </div>
+                    <div className="level-diagram" aria-hidden="true">
+                      <div className="mini-card">
+                        <b>{glyphs[i % glyphs.length]}</b>
+                        <i /><i />
+                        <span className="mc-check">✓</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="card-body">
+                    <h3>{field(lv, 'name')}</h3>
+                    {/* الاسم باللغة التانية كعنوان فرعي */}
+                    <p className="level-alt" lang={lang === 'ar' ? 'en' : 'ar'}>
+                      {lang === 'ar' ? lv.name_en : lv.name_ar}
+                    </p>
+                  </div>
+                </article>
               ))
             )}
           </div>
         </div>
       </section>
 
-      {/* HOW IT WORKS — ترتيب خطوات حقيقي */}
-      <section className="block how" id="how">
-        <div className="container">
-          <div className="section-head"><h2>{t('howTitle')}</h2></div>
-          <div className="grid grid-3">
-            {steps.map((s, i) => (
-              <div className="card bt-step" key={i}>
-                <span className="bt-step-num">{i + 1}</span>
-                <h3>{s.title}</h3>
-                <p>{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* PACKAGES */}
-      <section className="block" id="packages" style={{ background: 'var(--paper-2)' }}>
+      <section className="block" id="packages">
         <div className="container">
           <div className="section-head">
             <div>
+              <div className="eyebrow">PACKAGES</div>
               <h2>{t('packagesTitle')}</h2>
               <p className="section-sub">{P.packagesSub}</p>
             </div>
@@ -253,6 +302,20 @@ function Home() {
           </div>
         </div>
       </section>
+
+      {/* بانر ختامي */}
+      <div className="container">
+        <div className="banner">
+          <div>
+            <span className="badge">{isEn ? 'Your learning space' : 'مساحتك للتعلّم'}</span>
+            <h2 style={{ marginTop: 10 }}>{isEn ? 'Every step counts. Start today.' : 'كل خطوة بتفرق. ابدأ النهارده.'}</h2>
+            <p>{isEn ? 'Courses organized by your stage, with direct follow-up from Miss Sherhan.' : 'كورسات مرتبة على حسب مرحلتك، ومتابعة مباشرة من مس شيرهان.'}</p>
+          </div>
+          <div>
+            <a className="btn btn-gold" href="#packages">{t('seePackages')}</a>
+          </div>
+        </div>
+      </div>
 
       {buying && <PurchaseModal pkg={buying} levels={levels} onClose={() => setBuying(null)} />}
     </div>

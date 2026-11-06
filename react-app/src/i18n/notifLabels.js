@@ -103,7 +103,7 @@ export function describeNotification(n, audience, lang) {
 
   switch (n.type) {
     case 'payment_new':
-      return { icon: '💳', title: ar ? `تحويل جديد من ${name}` : `New transfer from ${name}`, body: join([d.package, money]) };
+      return { icon: '💳', title: ar ? `تحويل جديد من ${name}` : `New transfer from ${name}`, body: join([d.package, money, d.code]) };
     case 'payment_submitted':
       return { icon: '📨', title: ar ? 'وصلنا طلب التحويل' : 'We received your transfer', body: d.package || '' };
     case 'payment_approved':

@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../services/supabase';
 
 export function usePaymentSettings() {
-  const [state, setState] = useState({ number: '', holder: '', note: '', loading: true });
+  const [state, setState] = useState({ number: '', holder: '', note: '', whatsapp: '', loading: true });
 
   useEffect(() => {
     let alive = true;
@@ -20,6 +20,7 @@ export function usePaymentSettings() {
           number: (data && data.transfer_number) || '',
           holder: (data && data.transfer_name) || '',
           note: (data && data.transfer_note) || '',
+          whatsapp: (data && data.whatsapp_number) || '',
           loading: false,
         });
       });
